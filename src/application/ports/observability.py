@@ -1,0 +1,19 @@
+from __future__ import annotations
+
+from typing import Protocol
+
+
+class ReadinessCheck(Protocol):
+    async def ready(self) -> bool: ...
+
+
+class OutboxMetrics(Protocol):
+    def record_published(self, lag_seconds: float) -> None: ...
+
+    def record_error(self) -> None: ...
+
+    def set_queue_size(self, count: int) -> None: ...
+
+    def set_failed_count(self, count: int) -> None: ...
+
+    def observe_batch(self, duration_seconds: float) -> None: ...

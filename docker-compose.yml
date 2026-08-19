@@ -1,0 +1,106 @@
+x-app-build: &app-build
+  build:
+    context: .
+    target: runtime
+  image: payment-service:local
+
+x-app-env: &app-env
+  env_file: .env
+  environment:
+    DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://payments:payments@postgres:5432/payments}
+    RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+    API_KEY: ${API_KEY:-changeme}
+
+services:
+  postgres:
+    image: postgres:16.6-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-payments}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payments}
+      POSTGRES_DB: ${POSTGRES_DB:-payments}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payments} -d ${POSTGRES_DB:-payments}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13.7-management-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    <<: *app-build
+    restart: "no"
+    command: alembic upgrade head
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://payments:payments@postgres:5432/payments}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: [*app-build, *app-env]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: >-
+      uvicorn presentation.api:app
+      --host 0.0.0.0
+      --port 8000
+      --workers ${WEB_WORKERS:-2}
+      --timeout-graceful-shutdown 25
+      --no-access-log
+    ports:
+      - "8000:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - from urllib.request import urlopen; urlopen("http://127.0.0.1:8000/ready")
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  consumer:
+    <<: [*app-build, *app-env]
+    restart: unless-stopped
+    stop_grace_period: 30s
+    command: >-
+      faststream run presentation.consumer:app
+      --workers ${CONSUMER_WORKERS:-1}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

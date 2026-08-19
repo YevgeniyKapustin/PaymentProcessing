@@ -1,0 +1,55 @@
+[project]
+name = "payment-service"
+version = "0.1.0"
+description = "Async payment-processing microservice"
+readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+    "fastapi>=0.115.6,<0.116",
+    "uvicorn[standard]>=0.34.0,<0.35",
+    "pydantic>=2.10.4,<3",
+    "pydantic-settings>=2.7.1,<3",
+    "sqlalchemy[asyncio]>=2.0.36,<2.1",
+    "asyncpg>=0.30.0,<0.32",
+    "alembic[tz]>=1.14.0,<1.15",
+    "faststream[rabbit,cli]>=0.5.40,<0.6",
+    "aio-pika>=9.5.4,<10",
+    "httpx>=0.28.1,<0.29",
+    "structlog>=24.4.0,<26",
+]
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+packages = [
+    {include = "application", from = "src"},
+    {include = "domain", from = "src"},
+    {include = "infrastructure", from = "src"},
+    {include = "presentation", from = "src"},
+    {include = "factory.py", from = "src"},
+    {include = "runtime.py", from = "src"},
+]
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.3.4,<9"
+pytest-asyncio = ">=0.25.2,<0.26"
+ruff = ">=0.9.0,<0.12"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+markers = [
+    "integration: needs Postgres (set TEST_DATABASE_URL)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src"]
+
+[tool.pyright]
+extraPaths = ["src"]
