@@ -49,4 +49,5 @@ class PaymentApi(Entrypoint):
         await self._runtime.close()
 
 
-app = PaymentApi.from_env().app
+def create_app() -> FastAPI:
+    return PaymentApi.from_env().app

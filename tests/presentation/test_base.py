@@ -1,3 +1,4 @@
+import importlib
 from unittest.mock import MagicMock
 
 import pytest
@@ -79,3 +80,24 @@ def test_runtime_from_env_configures_logging_before_build(
     PaymentApi.runtime_from_env()
     assert captured["owns_broker"] is True
     assert captured["logging"]["service"] == "payment-api"
+
+
+@pytest.mark.parametrize(
+    ("module_name", "cls_name"),
+    [
+        ("presentation.api", "PaymentApi"),
+        ("presentation.consumer", "PaymentConsumer"),
+        ("presentation.publisher", "OutboxPublisher"),
+    ],
+)
+def test_create_app_builds_from_env(
+    module_name: str,
+    cls_name: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = importlib.import_module(module_name)
+    cls = getattr(module, cls_name)
+    fake = MagicMock()
+    fake.app = object()
+    monkeypatch.setattr(cls, "from_env", classmethod(lambda factory_cls: fake))
+    assert module.create_app() is fake.app

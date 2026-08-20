@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Self
 
+from faststream import FastStream
+
 from runtime import Runtime
 from presentation.base import Entrypoint
 from infrastructure.messaging.consumer import FastStreamAppFactory
@@ -45,4 +47,5 @@ class PaymentConsumer(Entrypoint):
         await self._runtime.close()
 
 
-app = PaymentConsumer.from_env().app
+def create_app() -> FastStream:
+    return PaymentConsumer.from_env().app

@@ -43,7 +43,7 @@ asyncio_default_fixture_loop_scope = "function"
 pythonpath = ["src", "."]
 testpaths = ["tests"]
 markers = [
-    "integration: needs Postgres (set TEST_DATABASE_URL)",
+    "integration: needs Docker Postgres on 127.0.0.1:5432",
 ]
 
 [tool.ruff]

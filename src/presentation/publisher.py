@@ -60,4 +60,5 @@ class OutboxPublisher(Entrypoint):
             await self._runtime.close()
 
 
-app = OutboxPublisher.from_env().app
+def create_app() -> FastAPI:
+    return OutboxPublisher.from_env().app

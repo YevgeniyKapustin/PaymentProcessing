@@ -9,9 +9,10 @@ from functools import partial
 from uuid import uuid4
 
 import pytest
+from asyncpg.exceptions import InvalidCatalogNameError
 from sqlalchemy import text
 from sqlalchemy.engine.url import make_url
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from application.exceptions import DuplicateIdempotencyKey
@@ -37,7 +38,8 @@ DEFAULT_TEST_DATABASE_URL = (
     "postgresql+asyncpg://payments:payments@127.0.0.1:5432/payments_test"
 )
 ADMIN_DATABASE = "payments"
-_SKIP_REASON: str | None = None
+_CONNECT_ERRORS = (OSError, DBAPIError, InvalidCatalogNameError)
+_FAIL_REASON: str | None = None
 _DATABASE_READY = False
 
 
@@ -45,38 +47,31 @@ def _database_url() -> str:
     return os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 
 
-def _skip_postgres(reason: str) -> None:
-    global _SKIP_REASON
-    _SKIP_REASON = reason
-    pytest.skip(reason)
+def _fail_postgres(reason: str) -> None:
+    global _FAIL_REASON
+    _FAIL_REASON = reason
+    pytest.fail(reason)
 
 
 async def _ensure_database(url: str) -> None:
-    global _SKIP_REASON, _DATABASE_READY
-    if _SKIP_REASON is not None:
-        pytest.skip(_SKIP_REASON)
+    global _FAIL_REASON, _DATABASE_READY
+    if _FAIL_REASON is not None:
+        pytest.fail(_FAIL_REASON)
     if _DATABASE_READY:
         return
     parsed = make_url(url)
     db_name = parsed.database
     if db_name is None or not db_name.isidentifier():
-        _skip_postgres("invalid test database name")
+        _fail_postgres("invalid test database name")
     engine = create_async_engine(url, connect_args={"timeout": 2})
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         _DATABASE_READY = True
         return
-    except (OSError, OperationalError) as exc:
-        message = str(exc).lower()
-        unreachable = (
-            "refused" in message
-            or "could not connect" in message
-            or "timeout" in message
-            or "does not exist" not in message
-        )
-        if unreachable:
-            _skip_postgres(f"Postgres docker container is not reachable: {exc}")
+    except _CONNECT_ERRORS as exc:
+        if not _is_missing_database(exc):
+            _fail_postgres(_unreachable_message(url, exc))
     finally:
         await engine.dispose()
     admin = create_async_engine(
@@ -94,11 +89,30 @@ async def _ensure_database(url: str) -> None:
             ).scalar()
             if not exists:
                 await conn.execute(text(f"CREATE DATABASE {db_name}"))
-    except (OSError, OperationalError) as exc:
-        _skip_postgres(f"Postgres docker container is not reachable: {exc}")
+    except _CONNECT_ERRORS as exc:
+        _fail_postgres(_unreachable_message(url, exc))
     finally:
         await admin.dispose()
     _DATABASE_READY = True
+
+
+def _is_missing_database(exc: BaseException) -> bool:
+    current: BaseException | None = exc
+    while current is not None:
+        if isinstance(current, InvalidCatalogNameError):
+            return True
+        if "does not exist" in str(current).lower():
+            return True
+        current = current.__cause__
+    return False
+
+
+def _unreachable_message(url: str, exc: BaseException) -> str:
+    return (
+        f"Cannot reach Docker Postgres at {url}. "
+        "Publish host port 5432 on the postgres service. "
+        f"Original error: {exc}"
+    )
 
 
 def _payment(*, key: str | None = None) -> Payment:
@@ -123,9 +137,9 @@ async def session_factory() -> AsyncIterator[async_sessionmaker[AsyncSession]]:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
-    except (OSError, OperationalError) as exc:
+    except _CONNECT_ERRORS as exc:
         await engine.dispose()
-        pytest.skip(f"Postgres docker container is not reachable: {exc}")
+        pytest.fail(_unreachable_message(url, exc))
     try:
         yield database.create_session_factory(engine)
     finally:
@@ -204,11 +218,11 @@ async def test_gateway_cache_keeps_first_charge_across_instances(
 ) -> None:
     rolls = iter([0.0, 0.99])
     monkeypatch.setattr(
-        "infrastructure.gateway.random_emulator.random.random",
+        "infrastructure.gateway.outcome.random.random",
         lambda: next(rolls),
     )
     monkeypatch.setattr(
-        "infrastructure.gateway.random_emulator.random.uniform",
+        "infrastructure.gateway.delay.random.uniform",
         lambda _a, _b: 0.0,
     )
     cache = SqlGatewayResultCache(session_factory, SystemClock())
