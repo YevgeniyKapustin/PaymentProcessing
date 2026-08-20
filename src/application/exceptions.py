@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from uuid import UUID
 
 
@@ -19,9 +21,23 @@ class PaymentNotFound(Exception):
         super().__init__(f"payment {payment_id} not found")
 
 
-class TransientDependencyError(Exception):
+class ProcessingError(Exception):
     pass
 
 
-class PermanentProcessingError(Exception):
+class TransientDependencyError(ProcessingError):
     pass
+
+
+class PermanentProcessingError(ProcessingError):
+    pass
+
+
+@contextmanager
+def as_transient(message: str) -> Iterator[None]:
+    try:
+        yield
+    except ProcessingError:
+        raise
+    except Exception as exc:
+        raise TransientDependencyError(message) from exc

@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from application.exceptions import (
-    PermanentProcessingError,
-    TransientDependencyError,
-)
+from application.exceptions import PermanentProcessingError, as_transient
 from application.ports import Clock, PaymentGateway
 from application.records import GatewayResult
 from application.uow import UowFactory
@@ -26,10 +23,9 @@ class ChargePayment:
 
     async def execute(self, payment_id: UUID) -> Payment:
         payment = await self._load(payment_id)
-        if not payment.is_terminal:
-            await self._charge_and_complete(payment)
-            payment = await self._load(payment_id)
-        return payment
+        if payment.is_terminal:
+            return payment
+        return await self._charge_and_complete(payment)
 
     async def _load(self, payment_id: UUID) -> Payment:
         async with self._uow_factory() as uow:
@@ -38,22 +34,16 @@ class ChargePayment:
                 raise PermanentProcessingError(f"payment {payment_id} not found")
             return payment
 
-    async def _charge_and_complete(self, payment: Payment) -> None:
+    async def _charge_and_complete(self, payment: Payment) -> Payment:
         result = await self._charge(payment)
-        await self._complete(payment, result)
+        return await self._complete(payment, result)
 
     async def _charge(self, payment: Payment) -> GatewayResult:
-        try:
+        with as_transient("gateway call failed"):
             return await self._gateway.charge(payment)
-        except TransientDependencyError:
-            raise
-        except PermanentProcessingError:
-            raise
-        except Exception as exc:
-            raise TransientDependencyError("gateway call failed") from exc
 
-    async def _complete(self, payment: Payment, result: GatewayResult) -> None:
-        try:
+    async def _complete(self, payment: Payment, result: GatewayResult) -> Payment:
+        with as_transient("failed to persist payment"):
             async with self._uow_factory() as uow:
                 current = await uow.payments.get_for_update(payment.id)
                 if current is None:
@@ -68,9 +58,4 @@ class ChargePayment:
                         current.fail(now)
                     await uow.payments.save(current)
                     await uow.commit()
-        except PermanentProcessingError:
-            raise
-        except TransientDependencyError:
-            raise
-        except Exception as exc:
-            raise TransientDependencyError("failed to persist payment") from exc
+                return current
