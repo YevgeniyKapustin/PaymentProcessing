@@ -33,7 +33,7 @@ class SqlOutboxQueue:
     ) -> list[OutboxRecord]:
         stmt = (
             select(OutboxModel)
-            .where(self._claim_filter.expression(now, stale_before))
+            .where(self._claim_filter.build(now, stale_before))
             .order_by(OutboxModel.created_at)
             .limit(limit)
             .with_for_update(skip_locked=True)

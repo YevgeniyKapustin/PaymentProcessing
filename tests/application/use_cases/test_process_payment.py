@@ -102,7 +102,7 @@ async def test_charge_success_marks_succeeded_and_sends_webhook() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=True)
+    gateway = FakeGateway(is_successful=True)
     webhook = FakeWebhookSender()
     await _use_case(store, gateway, webhook).execute(payment.id.value)
     assert gateway.calls == 1
@@ -118,7 +118,7 @@ async def test_charge_failure_marks_failed_and_sends_webhook() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=False)
+    gateway = FakeGateway(is_successful=False)
     webhook = FakeWebhookSender()
     await _use_case(store, gateway, webhook).execute(payment.id.value)
     assert gateway.calls == 1
@@ -180,7 +180,7 @@ async def test_retry_after_save_failure_does_not_capture_twice() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=True)
+    gateway = FakeGateway(is_successful=True)
     webhook = FakeWebhookSender()
     use_case = ProcessPayment(
         make_save_failing_factory(store),
@@ -203,7 +203,7 @@ async def test_webhook_failure_after_persist_does_not_charge_again() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=True)
+    gateway = FakeGateway(is_successful=True)
     webhook = FakeWebhookSender(fail_times=1)
     use_case = _use_case(store, gateway, webhook)
     with pytest.raises(TransientDependencyError, match="webhook"):
@@ -222,7 +222,7 @@ async def test_payment_missing_on_lock_is_permanent() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=True)
+    gateway = FakeGateway(is_successful=True)
     webhook = FakeWebhookSender()
     use_case = ProcessPayment(
         make_missing_on_lock_factory(store),
@@ -242,7 +242,7 @@ async def test_transient_error_during_complete_is_reraised() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
-    gateway = FakeGateway(succeeded=True)
+    gateway = FakeGateway(is_successful=True)
     webhook = FakeWebhookSender()
     use_case = ProcessPayment(
         make_transient_save_factory(store),

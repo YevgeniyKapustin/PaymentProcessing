@@ -209,7 +209,7 @@ async def test_ready_is_ok_without_probe() -> None:
 @pytest.mark.asyncio
 async def test_ready_is_503_when_probe_fails() -> None:
     class Down:
-        async def ready(self) -> bool:
+        async def is_ready(self) -> bool:
             return False
 
     clock = FrozenClock(datetime(2026, 8, 18, tzinfo=UTC))
@@ -230,7 +230,7 @@ async def test_ready_is_503_when_probe_fails() -> None:
 @pytest.mark.asyncio
 async def test_ready_is_ok_when_probe_passes() -> None:
     class Up:
-        async def ready(self) -> bool:
+        async def is_ready(self) -> bool:
             return True
 
     clock = FrozenClock(datetime(2026, 8, 18, tzinfo=UTC))

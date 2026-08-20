@@ -8,7 +8,7 @@ class AccessLogPolicy:
         {"/health", "/ready", "/docs", "/redoc", "/openapi.json"},
     )
 
-    def level_for(self, status_code: int) -> int:
+    def choose_log_level(self, status_code: int) -> int:
         if status_code >= 500:
             return logging.ERROR
         if status_code >= 400:

@@ -7,13 +7,13 @@ from application.exceptions import (
 
 
 class WebhookErrorMapper:
-    def timeout(self) -> TransientDependencyError:
+    def map_timeout(self) -> TransientDependencyError:
         return TransientDependencyError("webhook timeout")
 
-    def transport(self) -> TransientDependencyError:
+    def map_transport(self) -> TransientDependencyError:
         return TransientDependencyError("webhook transport error")
 
-    def from_status(self, status_code: int) -> None:
+    def raise_for_status(self, status_code: int) -> None:
         if 200 <= status_code < 300:
             return
         if 400 <= status_code < 500:

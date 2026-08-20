@@ -30,7 +30,7 @@ class FailureRouter:
         retry_count: int,
         error: Exception,
     ) -> None:
-        action = self._policy.action(retry_count, error)
+        action = self._policy.decide_action(retry_count, error)
         if action is DispatchAction.DLQ:
             await self._to_dlq(body, headers, retry_count, error)
             return
@@ -43,7 +43,7 @@ class FailureRouter:
         retry_count: int,
         error: Exception,
     ) -> None:
-        delay = self._policy.delay_seconds(retry_count)
+        delay = self._policy.compute_delay_seconds(retry_count)
         next_headers = dict(headers or {})
         next_headers[RETRY_COUNT_HEADER] = retry_count + 1
         await self._publisher.publish(

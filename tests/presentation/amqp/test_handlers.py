@@ -180,11 +180,11 @@ async def test_subscriber_dispatches_to_handler() -> None:
         queue=NEW_QUEUE,
         exchange=PAYMENTS_EXCHANGE,
     )
-    msg = object()
+    message = object()
     handler = captured["handler"]
     assert callable(handler)
-    await handler({"payment_id": "x"}, msg)
-    dispatcher.dispatch.assert_awaited_once_with({"payment_id": "x"}, msg)
+    await handler({"payment_id": "x"}, message)
+    dispatcher.dispatch.assert_awaited_once_with({"payment_id": "x"}, message)
 
 
 @pytest.mark.asyncio
@@ -330,20 +330,20 @@ async def test_dispatch_acks_after_success() -> None:
     payment = pending_payment()
     store.payments[payment.id.value] = payment
     body = {"payment_id": str(payment.id.value)}
-    msg = _FakeMessage(_raw(body), {})
+    message = _FakeMessage(_raw(body), {})
     dispatcher = PaymentMessageDispatcher(_process(store), FakePublisher())
-    await dispatcher.dispatch(body, msg)
-    assert msg.acked is True
-    assert msg.requeue is None
+    await dispatcher.dispatch(body, message)
+    assert message.acked is True
+    assert message.requeue is None
 
 
 @pytest.mark.asyncio
 async def test_dispatch_rejects_to_dlq_when_forward_fails() -> None:
-    msg = _FakeMessage(b"{}", {})
+    message = _FakeMessage(b"{}", {})
     dispatcher = PaymentMessageDispatcher(
         _process(InMemoryStore()),
         FakePublisher(error=RuntimeError("broker down")),
     )
-    await dispatcher.dispatch({}, msg)
-    assert msg.acked is False
-    assert msg.requeue is False
+    await dispatcher.dispatch({}, message)
+    assert message.acked is False
+    assert message.requeue is False

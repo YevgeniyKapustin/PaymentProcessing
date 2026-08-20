@@ -22,11 +22,11 @@ def test_resolve_request_id_rejects_garbage() -> None:
     assert len(generated) == 36
 
 
-def test_level_for_status() -> None:
+def test_choose_log_level_for_status() -> None:
     policy = AccessLogPolicy()
-    assert policy.level_for(200) == logging.INFO
-    assert policy.level_for(404) == logging.WARNING
-    assert policy.level_for(500) == logging.ERROR
+    assert policy.choose_log_level(200) == logging.INFO
+    assert policy.choose_log_level(404) == logging.WARNING
+    assert policy.choose_log_level(500) == logging.ERROR
 
 
 def test_health_success_is_not_access_logged() -> None:

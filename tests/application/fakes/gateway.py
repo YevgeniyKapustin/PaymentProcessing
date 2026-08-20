@@ -9,10 +9,10 @@ from domain.payment import Payment
 class FakeGateway:
     def __init__(
         self,
-        succeeded: bool = True,
+        is_successful: bool = True,
         error: BaseException | None = None,
     ) -> None:
-        self.succeeded = succeeded
+        self.is_successful = is_successful
         self.error = error
         self.calls = 0
         self._results: dict[UUID, GatewayResult] = {}
@@ -28,6 +28,6 @@ class FakeGateway:
         cached = self._results.get(payment.id.value)
         if cached is not None:
             return cached
-        result = GatewayResult(succeeded=self.succeeded)
+        result = GatewayResult(is_successful=self.is_successful)
         self._results[payment.id.value] = result
         return result

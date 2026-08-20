@@ -28,7 +28,7 @@ class SqlPaymentRepository:
         try:
             await self._session.flush()
         except IntegrityError as exc:
-            if self._idempotency.matches(exc):
+            if self._idempotency.is_idempotency_conflict(exc):
                 raise DuplicateIdempotencyKey from exc
             raise
 

@@ -7,5 +7,5 @@ class RandomChargeOutcome:
     def __init__(self, success_rate: float) -> None:
         self._success_rate = success_rate
 
-    def succeeded(self) -> bool:
+    def is_successful(self) -> bool:
         return random.random() < self._success_rate

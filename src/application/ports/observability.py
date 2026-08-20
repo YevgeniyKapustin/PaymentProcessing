@@ -4,7 +4,7 @@ from typing import Protocol
 
 
 class ReadinessCheck(Protocol):
-    async def ready(self) -> bool: ...
+    async def is_ready(self) -> bool: ...
 
 
 class OutboxMetrics(Protocol):

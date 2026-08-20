@@ -32,7 +32,7 @@ class PublishOutbox:
         retention_days: int = 3,
         retry_initial_seconds: float = 1.0,
         retry_cap_seconds: float = 60.0,
-        jitter: bool = True,
+        use_jitter: bool = True,
         metrics: OutboxMetrics | None = None,
         events: OutboxEventCodec | None = None,
         backoff: ExponentialDelay | None = None,
@@ -49,7 +49,7 @@ class PublishOutbox:
         self._backoff = backoff or ExponentialDelay(
             initial=retry_initial_seconds,
             cap=retry_cap_seconds,
-            jitter=jitter,
+            use_jitter=use_jitter,
         )
         self._metrics = metrics or NullOutboxMetrics()
         self._purge = purge or PurgeProcessedOutbox(
@@ -81,7 +81,7 @@ class PublishOutbox:
                     log.exception("outbox.publish_failed", extra=self._log_fields(record))
                     self._metrics.record_error()
                     if published == 0:
-                        await self._unclaim([item.id for item in records])
+                        await self._unclaim([record.id for record in records])
                         raise
                     await self._retry_or_fail(record)
         finally:
@@ -122,7 +122,7 @@ class PublishOutbox:
             )
         else:
             status = OutboxStatus.NEW
-            delay = self._backoff.seconds(attempts)
+            delay = self._backoff.delay_for(attempts)
             available_at = now + timedelta(seconds=delay)
         async with self._uow_factory() as uow:
             await uow.outbox_queue.release(

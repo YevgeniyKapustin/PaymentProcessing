@@ -21,8 +21,8 @@ class InboundPaymentMessage:
         self._events = events or OutboxEventCodec()
         self._request_ids = request_ids or RequestId()
 
-    def payment_id(self, body: dict[str, Any]) -> UUID:
-        raw = self._events.payment_id(body)
+    def parse_payment_id(self, body: dict[str, Any]) -> UUID:
+        raw = self._events.extract_payment_id(body)
         if raw is None:
             raise PermanentProcessingError("message missing payment_id")
         try:
@@ -30,21 +30,21 @@ class InboundPaymentMessage:
         except ValueError as exc:
             raise PermanentProcessingError("invalid payment_id") from exc
 
-    def outbox_id(
+    def parse_outbox_id(
         self,
         body: dict[str, Any],
         headers: Mapping[str, Any] | None,
     ) -> UUID | None:
-        return self._events.outbox_id(body, headers)
+        return self._events.extract_outbox_id(body, headers)
 
-    def retry_count(self, headers: Mapping[str, Any] | None) -> int:
+    def parse_retry_count(self, headers: Mapping[str, Any] | None) -> int:
         raw = (headers or {}).get(RETRY_COUNT_HEADER, 0)
         try:
             return int(raw)
         except (TypeError, ValueError):
             return 0
 
-    def request_id(self, headers: Mapping[str, Any] | None) -> str:
+    def parse_request_id(self, headers: Mapping[str, Any] | None) -> str:
         raw = (headers or {}).get(REQUEST_ID_HEADER)
         if raw is None:
             raw = (headers or {}).get("X-Request-ID")

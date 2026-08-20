@@ -11,9 +11,9 @@ class ProcessedMessageInbox:
         self._uow_factory = uow_factory
         self._clock = clock
 
-    async def seen(self, message_id: UUID) -> bool:
+    async def has_seen(self, message_id: UUID) -> bool:
         async with self._uow_factory() as uow:
-            return await uow.inbox.exists(message_id)
+            return await uow.inbox.has_message(message_id)
 
     async def remember(self, message_id: UUID) -> None:
         async with self._uow_factory() as uow:

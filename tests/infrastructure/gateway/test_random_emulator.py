@@ -47,16 +47,16 @@ async def test_gateway_replays_first_result_for_same_payment(
     first = await gateway.charge(payment)
     second = await gateway.charge(payment)
     other_result = await gateway.charge(other)
-    assert first.succeeded is True
+    assert first.is_successful is True
     assert second is first
-    assert other_result.succeeded is False
+    assert other_result.is_successful is False
 
 
 @pytest.mark.asyncio
 async def test_gateway_cache_does_not_overwrite_first_result() -> None:
     cache = InMemoryGatewayResultCache()
     payment_id = uuid4()
-    first = await cache.put_if_absent(payment_id, GatewayResult(succeeded=True))
-    second = await cache.put_if_absent(payment_id, GatewayResult(succeeded=False))
-    assert first.succeeded is True
+    first = await cache.put_if_absent(payment_id, GatewayResult(is_successful=True))
+    second = await cache.put_if_absent(payment_id, GatewayResult(is_successful=False))
+    assert first.is_successful is True
     assert second is first

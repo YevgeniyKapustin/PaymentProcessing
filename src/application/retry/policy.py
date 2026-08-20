@@ -26,16 +26,16 @@ class RetryPolicy:
         self._delay = delay or ExponentialDelay(
             initial=RETRY_INITIAL_SECONDS,
             cap=RETRY_CAP_SECONDS,
-            jitter=False,
+            use_jitter=False,
         )
 
-    def action(self, retry_count: int, error: BaseException) -> DispatchAction:
+    def decide_action(self, retry_count: int, error: BaseException) -> DispatchAction:
         if isinstance(error, PermanentProcessingError):
             return DispatchAction.DLQ
         if retry_count + 1 >= self._max_attempts:
             return DispatchAction.DLQ
         return DispatchAction.RETRY
 
-    def delay_seconds(self, retry_count: int) -> int:
-        delay = self._delay.seconds(max(retry_count, 0) + 1)
+    def compute_delay_seconds(self, retry_count: int) -> int:
+        delay = self._delay.delay_for(max(retry_count, 0) + 1)
         return max(1, int(delay))

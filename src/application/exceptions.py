@@ -34,7 +34,7 @@ class PermanentProcessingError(ProcessingError):
 
 
 @contextmanager
-def as_transient(message: str) -> Iterator[None]:
+def wrap_as_transient(message: str) -> Iterator[None]:
     try:
         yield
     except ProcessingError:

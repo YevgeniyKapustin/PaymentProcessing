@@ -26,15 +26,15 @@ class PaymentMessageDispatcher:
             publisher,
         )
 
-    async def dispatch(self, body: dict[str, Any], msg: RabbitMessage) -> None:
+    async def dispatch(self, body: dict[str, Any], message: RabbitMessage) -> None:
         try:
             await self._handler.handle(
                 body,
-                msg.headers,
-                encode_message_body(msg.body),
+                message.headers,
+                encode_message_body(message.body),
             )
         except Exception:
             log.exception("payment.handler_failed")
-            await msg.reject(requeue=False)
+            await message.reject(requeue=False)
             return
-        await msg.ack()
+        await message.ack()

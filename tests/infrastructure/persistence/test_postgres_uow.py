@@ -192,7 +192,7 @@ async def test_inbox_duplicate_does_not_rollback_payment(
     async with uow_factory() as uow:
         loaded = await uow.payments.get(payment.id)
         assert loaded is not None
-        assert await uow.inbox.exists(message_id)
+        assert await uow.inbox.has_message(message_id)
 
 
 @pytest.mark.asyncio
@@ -221,10 +221,10 @@ async def test_gateway_cache_keeps_first_charge_across_instances(
         max_delay_seconds=0,
         cache=cache,
     ).charge(payment)
-    assert first.succeeded is True
-    assert second.succeeded is True
+    assert first.is_successful is True
+    assert second.is_successful is True
     stored = await cache.get(payment.id.value)
-    assert stored == GatewayResult(succeeded=True)
+    assert stored == GatewayResult(is_successful=True)
 
 
 @pytest.mark.asyncio
@@ -240,7 +240,7 @@ async def test_payment_lookups_and_missing_rows(
         await uow.commit()
     async with uow_factory() as uow:
         loaded = await uow.payments.get_by_idempotency_key(payment.idempotency_key)
-        missing = await uow.inbox.exists(uuid4())
+        missing = await uow.inbox.has_message(uuid4())
     assert loaded is not None
     assert loaded.id == payment.id
     assert missing is False
@@ -453,8 +453,8 @@ async def test_gateway_cache_put_if_absent_keeps_first(
     cache = SqlGatewayResultCache(session_factory, SystemClock())
     payment_id = uuid4()
     assert await cache.get(payment_id) is None
-    first = await cache.put_if_absent(payment_id, GatewayResult(succeeded=True))
-    second = await cache.put_if_absent(payment_id, GatewayResult(succeeded=False))
-    assert first == GatewayResult(succeeded=True)
-    assert second == GatewayResult(succeeded=True)
-    assert await cache.get(payment_id) == GatewayResult(succeeded=True)
+    first = await cache.put_if_absent(payment_id, GatewayResult(is_successful=True))
+    second = await cache.put_if_absent(payment_id, GatewayResult(is_successful=False))
+    assert first == GatewayResult(is_successful=True)
+    assert second == GatewayResult(is_successful=True)
+    assert await cache.get(payment_id) == GatewayResult(is_successful=True)

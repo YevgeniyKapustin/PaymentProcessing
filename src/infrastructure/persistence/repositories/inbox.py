@@ -13,7 +13,7 @@ class SqlInboxRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def exists(self, message_id: UUID) -> bool:
+    async def has_message(self, message_id: UUID) -> bool:
         model = await self._session.get(InboxModel, message_id)
         return model is not None
 

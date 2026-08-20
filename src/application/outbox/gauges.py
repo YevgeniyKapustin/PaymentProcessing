@@ -11,7 +11,7 @@ class OutboxQueueGauges:
 
     async def refresh(self) -> None:
         async with self._uow_factory() as uow:
-            pending = await uow.outbox_queue.count_pending()
-            failed = await uow.outbox_queue.count_failed()
-        self._metrics.set_queue_size(pending)
-        self._metrics.set_failed_count(failed)
+            pending_count = await uow.outbox_queue.count_pending()
+            failed_count = await uow.outbox_queue.count_failed()
+        self._metrics.set_queue_size(pending_count)
+        self._metrics.set_failed_count(failed_count)

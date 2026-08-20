@@ -29,4 +29,4 @@ class OutboxRecord:
 
 @dataclass(frozen=True, slots=True)
 class GatewayResult:
-    succeeded: bool
+    is_successful: bool

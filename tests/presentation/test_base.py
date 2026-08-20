@@ -15,7 +15,7 @@ def _settings() -> Settings:
         rabbitmq_url="amqp://guest:guest@localhost/",
         api_key="test",
         log_level="DEBUG",
-        log_json=False,
+        use_json_logs=False,
     )
 
 
@@ -77,7 +77,7 @@ def test_runtime_from_env_configures_logging_before_build(
     assert captured["owns_broker"] is False
     assert captured["logging"]["service"] == "payment-consumer"
     assert captured["logging"]["level"] == "DEBUG"
-    assert captured["logging"]["json_logs"] is False
+    assert captured["logging"]["use_json_logs"] is False
     PaymentApi.runtime_from_env()
     assert captured["owns_broker"] is True
     assert captured["logging"]["service"] == "payment-api"

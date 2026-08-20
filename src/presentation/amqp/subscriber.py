@@ -30,6 +30,6 @@ class PaymentQueueSubscriber:
         )
         async def handle_payments_new(
             body: dict[str, Any],
-            msg: RabbitMessage,
+            message: RabbitMessage,
         ) -> None:
-            await dispatcher.dispatch(body, msg)
+            await dispatcher.dispatch(body, message)

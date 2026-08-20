@@ -34,23 +34,23 @@ class Resources:
     owns_broker: bool = True
     topology: MessageBrokerTopology = field(default_factory=PaymentsTopology)
     cleanup: ResourceCleanup = field(default_factory=ResourceCleanup)
-    _started: bool = field(default=False, init=False, repr=False)
-    _closed: bool = field(default=False, init=False, repr=False)
+    _is_started: bool = field(default=False, init=False, repr=False)
+    _is_closed: bool = field(default=False, init=False, repr=False)
 
     async def start(self) -> None:
-        if self._started:
+        if self._is_started:
             return
-        self._closed = False
+        self._is_closed = False
         await self.broker.connect()
         await self.topology.declare(self.broker)
-        self._started = True
+        self._is_started = True
 
     async def close(self) -> None:
-        if self._closed:
+        if self._is_closed:
             return
-        self._closed = True
+        self._is_closed = True
         errors = await self.cleanup.run(self._shutdown_steps())
-        self._started = False
+        self._is_started = False
         if errors:
             raise ExceptionGroup(
                 "Failed to gracefully shutdown resources",

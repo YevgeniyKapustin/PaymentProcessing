@@ -22,12 +22,12 @@ class LoggingConfigurator:
         self,
         *,
         level: str = "INFO",
-        json_logs: bool = True,
+        use_json_logs: bool = True,
         service: str,
         stream: TextIO | None = None,
     ) -> None:
         self._service = service
-        self._json_logs = json_logs
+        self._use_json_logs = use_json_logs
         self._stream = stream
         log_level = self._parse_log_level(level)
         shared = self._build_shared_processors()
@@ -78,13 +78,13 @@ class LoggingConfigurator:
         ]
 
     def _build_renderer(self) -> Processor:
-        if self._json_logs:
+        if self._use_json_logs:
             return structlog.processors.JSONRenderer()
         return structlog.dev.ConsoleRenderer(colors=True)
 
     def _configure_structlog(self, shared: list[Processor]) -> list[Processor]:
         processors = list(shared)
-        if self._json_logs:
+        if self._use_json_logs:
             processors.append(structlog.processors.format_exc_info)
         structlog.configure(
             processors=[

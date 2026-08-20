@@ -25,7 +25,7 @@ def test_json_log_includes_context_and_service() -> None:
     stream = StringIO()
     LoggingConfigurator().configure(
         level="INFO",
-        json_logs=True,
+        use_json_logs=True,
         service="payment-api",
         stream=stream,
     )
@@ -45,7 +45,7 @@ def test_invalid_level_falls_back_to_info() -> None:
     stream = StringIO()
     LoggingConfigurator().configure(
         level="nope",
-        json_logs=True,
+        use_json_logs=True,
         service="test",
         stream=stream,
     )
@@ -59,7 +59,7 @@ def test_console_renderer_is_used_when_json_disabled() -> None:
     stream = StringIO()
     LoggingConfigurator().configure(
         level="INFO",
-        json_logs=False,
+        use_json_logs=False,
         service="test",
         stream=stream,
     )

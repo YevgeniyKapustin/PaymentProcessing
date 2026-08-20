@@ -32,5 +32,5 @@ class RandomPaymentGateway:
         if cached is not None:
             return cached
         await self._delay.wait()
-        result = GatewayResult(succeeded=self._outcome.succeeded())
+        result = GatewayResult(is_successful=self._outcome.is_successful())
         return await self._cache.put_if_absent(payment_id, result)

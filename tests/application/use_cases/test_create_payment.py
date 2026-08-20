@@ -10,7 +10,7 @@ from application.exceptions import (
     DuplicateIdempotencyKey,
     IdempotencyConflict,
 )
-from application.use_cases.create_payment import CreatePayment, matches_create_input
+from application.use_cases.create_payment import CreatePayment, has_matching_create_input
 from domain.exceptions import InvalidCurrencyError, InvalidWebhookUrlError
 from domain.ids import IdempotencyKey, PaymentId
 from domain.money import Currency, Money
@@ -114,7 +114,7 @@ async def test_duplicate_key_without_existing_is_conflict() -> None:
     assert not isinstance(exc_info.value, DuplicateIdempotencyKey)
 
 
-def test_matches_create_input() -> None:
+def test_has_matching_create_input() -> None:
     payment = Payment.create(
         id=PaymentId(uuid4()),
         money=Money(Decimal("10.00"), Currency.USD),
@@ -124,8 +124,8 @@ def test_matches_create_input() -> None:
         webhook_url="https://example.com/hook",
         created_at=datetime(2026, 8, 18, tzinfo=UTC),
     )
-    assert matches_create_input(payment, _command(), payment.money)
-    assert not matches_create_input(
+    assert has_matching_create_input(payment, _command(), payment.money)
+    assert not has_matching_create_input(
         payment,
         _command(description="other"),
         payment.money,

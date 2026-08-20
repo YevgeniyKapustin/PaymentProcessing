@@ -24,7 +24,7 @@ class SqlGatewayResultCache:
             row = await session.get(GatewayChargeModel, payment_id)
             if row is None:
                 return None
-            return GatewayResult(succeeded=row.succeeded)
+            return GatewayResult(is_successful=row.is_successful)
 
     async def put_if_absent(
         self,
@@ -35,18 +35,18 @@ class SqlGatewayResultCache:
             insert(GatewayChargeModel)
             .values(
                 payment_id=payment_id,
-                succeeded=result.succeeded,
+                succeeded=result.is_successful,
                 created_at=self._clock.now(),
             )
             .on_conflict_do_nothing(index_elements=["payment_id"])
-            .returning(GatewayChargeModel.succeeded)
+            .returning(GatewayChargeModel.is_successful)
         )
         async with self._session_factory() as session:
             async with session.begin():
                 inserted = (await session.execute(stmt)).scalar_one_or_none()
                 if inserted is not None:
-                    return GatewayResult(succeeded=inserted)
+                    return GatewayResult(is_successful=inserted)
                 existing = await session.get(GatewayChargeModel, payment_id)
                 if existing is None:
                     raise RuntimeError(f"gateway charge {payment_id} missing")
-                return GatewayResult(succeeded=existing.succeeded)
+                return GatewayResult(is_successful=existing.is_successful)

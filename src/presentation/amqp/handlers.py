@@ -36,14 +36,14 @@ class PaymentMessageHandler:
     ) -> None:
         payment_id = body.get("payment_id")
         with log_context(
-            request_id=self._message.request_id(headers),
+            request_id=self._message.parse_request_id(headers),
             payment_id=str(payment_id) if payment_id else None,
         ):
             try:
-                parsed_id = self._message.payment_id(body)
+                parsed_id = self._message.parse_payment_id(body)
                 await self._process_payment.execute(
                     parsed_id,
-                    message_id=self._message.outbox_id(body, headers),
+                    message_id=self._message.parse_outbox_id(body, headers),
                 )
                 log.info(
                     "payment.processed",
@@ -53,6 +53,6 @@ class PaymentMessageHandler:
                 await self._failures.route(
                     body=raw_body,
                     headers=headers,
-                    retry_count=self._message.retry_count(headers),
+                    retry_count=self._message.parse_retry_count(headers),
                     error=exc,
                 )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Self
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
+        populate_by_name=True,
     )
 
     database_url: str
@@ -25,7 +27,10 @@ class Settings(BaseSettings):
     outbox_claim_timeout_seconds: float = 60.0
     outbox_retention_days: int = 3
     log_level: str = "INFO"
-    log_json: bool = True
+    use_json_logs: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("LOG_JSON", "USE_JSON_LOGS", "log_json", "use_json_logs"),
+    )
 
     @classmethod
     def from_env(cls) -> Self:

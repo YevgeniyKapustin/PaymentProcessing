@@ -19,7 +19,7 @@ class RequestTimer:
     def __init__(self) -> None:
         self._started = time.perf_counter()
 
-    def duration_ms(self) -> float:
+    def elapsed_ms(self) -> float:
         return round((time.perf_counter() - self._started) * 1000, 2)
 
 
@@ -44,7 +44,7 @@ class AccessLogMiddleware:
             self._log_access(
                 request,
                 status_code=response.status_code,
-                duration_ms=timer.duration_ms(),
+                elapsed_ms=timer.elapsed_ms(),
             )
             response.headers[REQUEST_ID_HEADER] = request_id
             return response
@@ -54,17 +54,17 @@ class AccessLogMiddleware:
         request: Request,
         *,
         status_code: int,
-        duration_ms: float,
+        elapsed_ms: float,
     ) -> None:
         if not self._policy.should_log(request.url.path, status_code):
             return
         log.log(
-            self._policy.level_for(status_code),
+            self._policy.choose_log_level(status_code),
             "http.request",
             extra={
                 "method": request.method,
                 "path": request.url.path,
                 "status_code": status_code,
-                "duration_ms": duration_ms,
+                "duration_ms": elapsed_ms,
             },
         )

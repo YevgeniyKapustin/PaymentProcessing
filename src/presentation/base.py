@@ -13,7 +13,7 @@ class Entrypoint:
     def configure_logging(cls, settings: Settings) -> None:
         LoggingConfigurator().configure(
             level=settings.log_level,
-            json_logs=settings.log_json,
+            use_json_logs=settings.use_json_logs,
             service=cls.service,
         )
 

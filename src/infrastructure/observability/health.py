@@ -17,7 +17,7 @@ class InfrastructureReadiness:
         self._broker = broker
         self._timeout_seconds = timeout_seconds
 
-    async def ready(self) -> bool:
+    async def is_ready(self) -> bool:
         try:
             async with self._engine.connect() as connection:
                 await connection.execute(text("SELECT 1"))

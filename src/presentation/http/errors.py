@@ -36,20 +36,20 @@ class UnhandledErrorMiddleware:
 
 
 class HttpExceptionHandlers:
-    async def conflict(self, request: Request, exc: Exception) -> JSONResponse:
+    async def handle_conflict(self, request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(
             status_code=409,
             content={"detail": "Idempotency key conflict"},
         )
 
-    async def not_found(self, request: Request, exc: Exception) -> JSONResponse:
+    async def handle_not_found(self, request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": "Payment not found"})
 
-    async def domain_error(self, request: Request, exc: Exception) -> JSONResponse:
+    async def handle_domain_error(self, request: Request, exc: Exception) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
 
     def register(self, app: FastAPI) -> None:
-        app.add_exception_handler(IdempotencyConflict, self.conflict)
-        app.add_exception_handler(DuplicateIdempotencyKey, self.conflict)
-        app.add_exception_handler(PaymentNotFound, self.not_found)
-        app.add_exception_handler(DomainError, self.domain_error)
+        app.add_exception_handler(IdempotencyConflict, self.handle_conflict)
+        app.add_exception_handler(DuplicateIdempotencyKey, self.handle_conflict)
+        app.add_exception_handler(PaymentNotFound, self.handle_not_found)
+        app.add_exception_handler(DomainError, self.handle_domain_error)

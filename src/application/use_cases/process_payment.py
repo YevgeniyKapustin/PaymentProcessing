@@ -33,7 +33,7 @@ class ProcessPayment:
         *,
         message_id: UUID | None = None,
     ) -> None:
-        if message_id is not None and await self._inbox.seen(message_id):
+        if message_id is not None and await self._inbox.has_seen(message_id):
             return
         payment = await self._charge.execute(payment_id)
         await self._webhook.execute(payment)

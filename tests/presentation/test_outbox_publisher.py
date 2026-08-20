@@ -39,14 +39,14 @@ def _runtime() -> Runtime:
 
 class FakeRelay:
     def __init__(self) -> None:
-        self.started = False
-        self.stopped = False
+        self.was_started = False
+        self.was_stopped = False
 
     def start(self) -> None:
-        self.started = True
+        self.was_started = True
 
     async def stop(self) -> None:
-        self.stopped = True
+        self.was_stopped = True
 
 
 @pytest.mark.asyncio
@@ -59,8 +59,8 @@ async def test_lifespan_starts_runtime_and_relay() -> None:
     app = SimpleNamespace(state=SimpleNamespace())
     async with publisher.lifespan(app):
         runtime.start.assert_awaited_once()
-        assert relay.started
-    assert relay.stopped
+        assert relay.was_started
+    assert relay.was_stopped
     runtime.close.assert_awaited_once()
 
 

@@ -203,7 +203,7 @@ class InMemoryOutboxRepository:
                 return
 
     async def unclaim(self, ids: list[UUID]) -> None:
-        id_set = set(ids)
+        claimed_ids = set(ids)
         self._store.outbox = [
             replace(
                 row,
@@ -211,7 +211,7 @@ class InMemoryOutboxRepository:
                 claimed_at=None,
                 available_at=None,
             )
-            if row.id in id_set
+            if row.id in claimed_ids
             else row
             for row in self._store.outbox
         ]
@@ -264,11 +264,11 @@ class InMemoryInboxRepository:
         self._store = store
         self._staged: list[UUID] = []
 
-    async def exists(self, message_id: UUID) -> bool:
+    async def has_message(self, message_id: UUID) -> bool:
         return message_id in self._store.inbox or message_id in self._staged
 
     async def add(self, message_id: UUID, processed_at: datetime) -> None:
-        if await self.exists(message_id):
+        if await self.has_message(message_id):
             return
         self._staged.append(message_id)
 
@@ -286,7 +286,7 @@ class InMemoryUnitOfWork:
         self.outbox = InMemoryOutboxRepository(store)
         self.outbox_queue = self.outbox
         self.inbox = InMemoryInboxRepository(store)
-        self.committed = False
+        self.is_committed = False
 
     async def __aenter__(self) -> InMemoryUnitOfWork:
         return self
@@ -304,7 +304,7 @@ class InMemoryUnitOfWork:
         self.payments.commit()
         self.outbox.commit()
         self.inbox.commit()
-        self.committed = True
+        self.is_committed = True
 
     async def rollback(self) -> None:
         self.payments.rollback()

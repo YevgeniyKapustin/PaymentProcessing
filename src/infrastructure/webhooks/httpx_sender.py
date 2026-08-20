@@ -37,7 +37,7 @@ class HttpxWebhookSender:
                 headers={"Idempotency-Key": idempotency_key},
             )
         except httpx.TimeoutException as exc:
-            raise self._errors.timeout() from exc
+            raise self._errors.map_timeout() from exc
         except httpx.TransportError as exc:
-            raise self._errors.transport() from exc
-        self._errors.from_status(response.status_code)
+            raise self._errors.map_transport() from exc
+        self._errors.raise_for_status(response.status_code)

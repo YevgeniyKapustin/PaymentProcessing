@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from application.exceptions import PermanentProcessingError, as_transient
+from application.exceptions import PermanentProcessingError, wrap_as_transient
 from application.ports import Clock, PaymentGateway
 from application.records import GatewayResult
 from application.uow import UowFactory
@@ -39,11 +39,11 @@ class ChargePayment:
         return await self._complete(payment, result)
 
     async def _charge(self, payment: Payment) -> GatewayResult:
-        with as_transient("gateway call failed"):
+        with wrap_as_transient("gateway call failed"):
             return await self._gateway.charge(payment)
 
     async def _complete(self, payment: Payment, result: GatewayResult) -> Payment:
-        with as_transient("failed to persist payment"):
+        with wrap_as_transient("failed to persist payment"):
             async with self._uow_factory() as uow:
                 current = await uow.payments.get_for_update(payment.id)
                 if current is None:
@@ -52,7 +52,7 @@ class ChargePayment:
                     )
                 if not current.is_terminal:
                     now = self._clock.now()
-                    if result.succeeded:
+                    if result.is_successful:
                         current.succeed(now)
                     else:
                         current.fail(now)

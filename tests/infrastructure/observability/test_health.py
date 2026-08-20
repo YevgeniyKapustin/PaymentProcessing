@@ -29,7 +29,7 @@ def _engine() -> MagicMock:
 async def test_ready_when_postgres_and_rabbit_respond() -> None:
     broker = SimpleNamespace(ping=AsyncMock(return_value=True))
     probe = InfrastructureReadiness(_engine(), broker)
-    assert await probe.ready() is True
+    assert await probe.is_ready() is True
     broker.ping.assert_awaited_once_with(1.0)
 
 
@@ -37,7 +37,7 @@ async def test_ready_when_postgres_and_rabbit_respond() -> None:
 async def test_not_ready_when_rabbit_is_down() -> None:
     broker = SimpleNamespace(ping=AsyncMock(return_value=False))
     probe = InfrastructureReadiness(_engine(), broker)
-    assert await probe.ready() is False
+    assert await probe.is_ready() is False
 
 
 @pytest.mark.asyncio
@@ -46,4 +46,4 @@ async def test_not_ready_when_postgres_raises() -> None:
     engine.connect.side_effect = RuntimeError("db down")
     broker = SimpleNamespace(ping=AsyncMock(return_value=True))
     probe = InfrastructureReadiness(engine, broker)
-    assert await probe.ready() is False
+    assert await probe.is_ready() is False

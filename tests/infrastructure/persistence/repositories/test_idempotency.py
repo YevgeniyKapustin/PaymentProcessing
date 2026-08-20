@@ -14,14 +14,16 @@ class _Orig:
 
 def test_idempotency_constraint_is_detected() -> None:
     orig = _Orig("uq_payments_idempotency_key", "duplicate key")
-    assert IdempotencyConstraint().matches(IntegrityError("INSERT", {}, orig))
+    assert IdempotencyConstraint().is_idempotency_conflict(IntegrityError("INSERT", {}, orig))
 
 
 def test_other_unique_constraint_is_not_idempotency() -> None:
     orig = _Orig("payments_pkey", "duplicate key value violates unique constraint")
-    assert not IdempotencyConstraint().matches(IntegrityError("INSERT", {}, orig))
+    assert not IdempotencyConstraint().is_idempotency_conflict(
+        IntegrityError("INSERT", {}, orig),
+    )
 
 
 def test_message_fallback_detects_idempotency_key() -> None:
     orig = _Orig("", "duplicate key value on column idempotency_key")
-    assert IdempotencyConstraint().matches(IntegrityError("INSERT", {}, orig))
+    assert IdempotencyConstraint().is_idempotency_conflict(IntegrityError("INSERT", {}, orig))

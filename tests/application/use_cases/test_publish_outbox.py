@@ -153,7 +153,7 @@ async def test_retry_schedules_available_at() -> None:
         max_attempts=8,
         retry_initial_seconds=1.0,
         retry_cap_seconds=60.0,
-        jitter=False,
+        use_jitter=False,
     )
     assert await use_case.execute() == 1
     delayed = {row.id: row for row in store.outbox}[second.id]

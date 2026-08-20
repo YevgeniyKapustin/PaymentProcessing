@@ -30,7 +30,7 @@ class OpsRouter:
         async def ready() -> JSONResponse:
             if readiness is None:
                 return JSONResponse({"status": "ok"})
-            if await readiness.ready():
+            if await readiness.is_ready():
                 return JSONResponse({"status": "ok"})
             return JSONResponse({"status": "not_ready"}, status_code=503)
 

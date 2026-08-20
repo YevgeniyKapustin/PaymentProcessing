@@ -26,13 +26,13 @@ class OutboxEventCodec:
         }
         return json.dumps(body).encode("utf-8"), headers
 
-    def payment_id(self, body: dict[str, Any]) -> str | None:
+    def extract_payment_id(self, body: dict[str, Any]) -> str | None:
         payload = body.get("payload")
         if isinstance(payload, dict) and payload.get("payment_id") is not None:
-            return self._as_text(payload.get("payment_id"))
-        return self._as_text(body.get("payment_id"))
+            return self._to_text(payload.get("payment_id"))
+        return self._to_text(body.get("payment_id"))
 
-    def outbox_id(
+    def extract_outbox_id(
         self,
         body: dict[str, Any],
         headers: Mapping[str, Any] | None,
@@ -40,7 +40,7 @@ class OutboxEventCodec:
         raw = body.get("outbox_id")
         if raw is None and headers is not None:
             raw = headers.get(OUTBOX_ID_HEADER)
-        text = self._as_text(raw)
+        text = self._to_text(raw)
         if text is None:
             return None
         try:
@@ -48,7 +48,7 @@ class OutboxEventCodec:
         except ValueError:
             return None
 
-    def _as_text(self, raw: object) -> str | None:
+    def _to_text(self, raw: object) -> str | None:
         if raw is None:
             return None
         if isinstance(raw, bytes):

@@ -24,10 +24,10 @@ class WorkerLoop:
         self._stop.set()
         await self._join()
 
-    def stopped(self) -> bool:
+    def is_stopped(self) -> bool:
         return self._stop.is_set()
 
-    async def idle(self, timeout: float) -> None:
+    async def wait(self, timeout: float) -> None:
         with suppress(TimeoutError):
             await asyncio.wait_for(self._stop.wait(), timeout=timeout)
 
@@ -45,14 +45,14 @@ class WorkerLoop:
         try:
             await task
         except asyncio.CancelledError:
-            if self._caller_cancelled():
+            if self._is_caller_cancelled():
                 raise
         finally:
             if task.done():
                 self._task = None
 
     @staticmethod
-    def _caller_cancelled() -> bool:
+    def _is_caller_cancelled() -> bool:
         caller = asyncio.current_task()
         return caller is not None and caller.cancelling() > 0
 

@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 
 
 class IdempotencyConstraint:
-    def matches(self, exc: IntegrityError) -> bool:
+    def is_idempotency_conflict(self, exc: IntegrityError) -> bool:
         orig = exc.orig
         constraint = ""
         if orig is not None:

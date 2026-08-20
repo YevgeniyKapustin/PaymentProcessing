@@ -8,7 +8,7 @@ from presentation.worker import WorkerLoop
 
 
 def test_delay_doubles_until_cap() -> None:
-    backoff = ExponentialBackoff(1.0, cap=8.0, jitter=False)
+    backoff = ExponentialBackoff(1.0, cap=8.0, use_jitter=False)
     assert backoff.next_delay() == 1.0
     assert backoff.next_delay() == 2.0
     assert backoff.next_delay() == 4.0
@@ -17,7 +17,7 @@ def test_delay_doubles_until_cap() -> None:
 
 
 def test_reset_restarts_from_initial() -> None:
-    backoff = ExponentialBackoff(1.0, cap=8.0, jitter=False)
+    backoff = ExponentialBackoff(1.0, cap=8.0, use_jitter=False)
     backoff.next_delay()
     backoff.next_delay()
     backoff.reset()
@@ -25,13 +25,13 @@ def test_reset_restarts_from_initial() -> None:
 
 
 def test_for_interval_floors_short_polls() -> None:
-    assert ExponentialBackoff.for_interval(0.01, jitter=False).next_delay() == 1.0
-    assert ExponentialBackoff.for_interval(5.0, jitter=False).next_delay() == 5.0
+    assert ExponentialBackoff.for_interval(0.01, use_jitter=False).next_delay() == 1.0
+    assert ExponentialBackoff.for_interval(5.0, use_jitter=False).next_delay() == 5.0
 
 
 def test_jitter_uses_shared_delay_seconds(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setattr("application.retry.backoff.random.random", lambda: 0.0)
-    backoff = ExponentialBackoff(2.0, cap=8.0, jitter=True)
+    backoff = ExponentialBackoff(2.0, cap=8.0, use_jitter=True)
     assert backoff.next_delay() == 1.0
 
 
@@ -43,8 +43,8 @@ async def test_can_restart_after_stop() -> None:
     async def run() -> None:
         nonlocal starts
         starts += 1
-        while not loop.stopped():
-            await loop.idle(60)
+        while not loop.is_stopped():
+            await loop.wait(60)
 
     loop.start(run)
     await asyncio.wait_for(loop.stop(), timeout=1)
@@ -62,8 +62,8 @@ async def test_start_while_running_is_noop() -> None:
     async def run() -> None:
         nonlocal starts
         starts += 1
-        while not loop.stopped():
-            await loop.idle(60)
+        while not loop.is_stopped():
+            await loop.wait(60)
 
     loop.start(run)
     loop.start(run)

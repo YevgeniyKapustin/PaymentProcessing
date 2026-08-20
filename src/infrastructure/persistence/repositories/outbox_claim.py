@@ -10,7 +10,7 @@ from infrastructure.persistence.models.outbox import OutboxModel
 
 
 class OutboxClaimFilter:
-    def expression(
+    def build(
         self,
         now: datetime,
         stale_before: datetime,
