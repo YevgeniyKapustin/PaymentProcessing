@@ -73,6 +73,26 @@ async def test_payment_and_outbox_appear_together() -> None:
 
 
 @pytest.mark.asyncio
+async def test_commit_failure_rolls_back_payment_and_outbox() -> None:
+    store = InMemoryStore()
+    clock = FrozenClock(datetime(2026, 8, 18, tzinfo=UTC))
+
+    def factory() -> InMemoryUnitOfWork:
+        uow = InMemoryUnitOfWork(store)
+
+        async def boom() -> None:
+            raise RuntimeError("db down")
+
+        uow.commit = boom  # type: ignore[method-assign]
+        return uow
+
+    with pytest.raises(RuntimeError, match="db down"):
+        await CreatePayment(factory, clock).execute(_command())
+    assert store.payments == {}
+    assert store.outbox == []
+
+
+@pytest.mark.asyncio
 async def test_unsupported_currency_is_domain_error() -> None:
     with pytest.raises(InvalidCurrencyError):
         await _use_case(InMemoryStore()).execute(_command(currency="GBP"))

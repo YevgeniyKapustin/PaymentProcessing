@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
@@ -17,6 +18,7 @@ from application.exceptions import DuplicateIdempotencyKey
 from application.payments.events import PAYMENT_CREATED
 from application.records import GatewayResult, OutboxStatus
 from application.uow import UowFactory
+from application.use_cases.publish_outbox import PublishOutbox
 from domain.ids import IdempotencyKey, PaymentId
 from domain.money import Currency, Money
 from domain.payment import Payment, PaymentStatus
@@ -27,7 +29,7 @@ from infrastructure.persistence.db import PostgresDatabase
 from infrastructure.persistence.models import Base
 from infrastructure.persistence.models.outbox import OutboxModel
 from infrastructure.persistence.uow import SqlAlchemyUnitOfWork
-from tests.application.fakes import pending_payment
+from tests.application.fakes import FakePublisher, FrozenClock, pending_payment
 
 pytestmark = pytest.mark.integration
 
@@ -458,3 +460,120 @@ async def test_gateway_cache_put_if_absent_keeps_first(
     assert first == GatewayResult(is_successful=True)
     assert second == GatewayResult(is_successful=True)
     assert await cache.get(payment_id) == GatewayResult(is_successful=True)
+
+
+@pytest.mark.asyncio
+async def test_payment_and_outbox_roll_back_together(
+    uow_factory: UowFactory,
+) -> None:
+    payment = pending_payment()
+    now = datetime(2026, 1, 2, tzinfo=UTC)
+    with pytest.raises(RuntimeError, match="boom"):
+        async with uow_factory() as uow:
+            await uow.payments.add(payment)
+            await uow.outbox.add(
+                event_type=PAYMENT_CREATED,
+                payload={"payment_id": str(payment.id.value)},
+                created_at=now,
+            )
+            raise RuntimeError("boom")
+    async with uow_factory() as uow:
+        assert await uow.payments.get(payment.id) is None
+        claimed = await uow.outbox_queue.claim_batch(
+            10,
+            now=now,
+            stale_before=now - timedelta(seconds=60),
+        )
+        assert claimed == []
+
+
+@pytest.mark.asyncio
+async def test_concurrent_claim_skips_locked_rows(
+    uow_factory: UowFactory,
+) -> None:
+    now = datetime(2026, 1, 2, tzinfo=UTC)
+    async with uow_factory() as uow:
+        for index in range(4):
+            await uow.outbox.add(
+                event_type=PAYMENT_CREATED,
+                payload={"payment_id": f"p{index}"},
+                created_at=now,
+            )
+        await uow.commit()
+    started = asyncio.Barrier(2)
+
+    async def claim_two() -> list:
+        async with uow_factory() as uow:
+            rows = await uow.outbox_queue.claim_batch(
+                2,
+                now=now,
+                stale_before=now - timedelta(seconds=60),
+            )
+            await started.wait()
+            await uow.commit()
+            return rows
+
+    async with asyncio.timeout(5):
+        first, second = await asyncio.gather(claim_two(), claim_two())
+    ids = {row.id for row in first} | {row.id for row in second}
+    assert len(first) == 2
+    assert len(second) == 2
+    assert len(ids) == 4
+
+
+@pytest.mark.asyncio
+async def test_claim_returns_rows_in_created_at_order(
+    uow_factory: UowFactory,
+) -> None:
+    t0 = datetime(2026, 1, 2, tzinfo=UTC)
+    async with uow_factory() as uow:
+        await uow.outbox.add(
+            event_type=PAYMENT_CREATED,
+            payload={"payment_id": "late"},
+            created_at=t0 + timedelta(seconds=2),
+        )
+        await uow.outbox.add(
+            event_type=PAYMENT_CREATED,
+            payload={"payment_id": "early"},
+            created_at=t0,
+        )
+        await uow.commit()
+    async with uow_factory() as uow:
+        claimed = await uow.outbox_queue.claim_batch(
+            10,
+            now=t0 + timedelta(seconds=3),
+            stale_before=t0 - timedelta(seconds=60),
+        )
+        await uow.commit()
+    assert [row.payload["payment_id"] for row in claimed] == ["early", "late"]
+
+
+@pytest.mark.asyncio
+async def test_publish_outbox_marks_processed_after_ack(
+    uow_factory: UowFactory,
+) -> None:
+    now = datetime(2026, 1, 2, tzinfo=UTC)
+    async with uow_factory() as uow:
+        await uow.outbox.add(
+            event_type=PAYMENT_CREATED,
+            payload={"payment_id": "a"},
+            created_at=now,
+        )
+        await uow.commit()
+    publisher = FakePublisher()
+    use_case = PublishOutbox(
+        uow_factory,
+        publisher,
+        FrozenClock(now),
+        use_jitter=False,
+    )
+    assert await use_case.execute() == 1
+    assert len(publisher.messages) == 1
+    async with uow_factory() as uow:
+        assert await uow.outbox_queue.count_pending() == 0
+        leftover = await uow.outbox_queue.claim_batch(
+            10,
+            now=now,
+            stale_before=now - timedelta(seconds=60),
+        )
+        assert leftover == []

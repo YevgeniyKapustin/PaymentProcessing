@@ -4,7 +4,6 @@ import logging
 import time
 from datetime import timedelta
 from typing import Any
-from uuid import UUID
 
 from application.outbox.codec import OutboxEventCodec
 from application.outbox.gauges import OutboxQueueGauges
@@ -63,13 +62,11 @@ class PublishOutbox:
     async def execute(self) -> int:
         started = time.perf_counter()
         records = await self._claim()
-        await self._gauges.refresh()
-        if not records:
-            await self._purge.execute()
-            self._metrics.observe_batch(time.perf_counter() - started)
-            return 0
         published = 0
         try:
+            if not records:
+                await self._purge.execute()
+                return 0
             for record in records:
                 try:
                     await self._deliver(record)
@@ -79,18 +76,15 @@ class PublishOutbox:
                         extra=self._log_fields(record),
                     )
                     self._metrics.record_error()
-                    if published == 0:
-                        await self._unclaim([item.id for item in records])
-                        raise
                     await self._retry_or_fail(record)
                 else:
                     published += 1
                     lag = (self._clock.now() - record.created_at).total_seconds()
                     self._metrics.record_published(lag)
+            return published
         finally:
             self._metrics.observe_batch(time.perf_counter() - started)
             await self._gauges.refresh()
-        return published
 
     async def _claim(self) -> list[OutboxRecord]:
         now = self._clock.now()
@@ -138,13 +132,6 @@ class PublishOutbox:
                 retry_count=attempts,
                 available_at=available_at,
             )
-            await uow.commit()
-
-    async def _unclaim(self, ids: list[UUID]) -> None:
-        if not ids:
-            return
-        async with self._uow_factory() as uow:
-            await uow.outbox_queue.unclaim(ids)
             await uow.commit()
 
     def _log_fields(

@@ -332,12 +332,15 @@ async def test_envelope_message_is_deduped_on_retry() -> None:
         "event_version": 1,
         "payload": {"payment_id": str(payment.id.value)},
     }
-    handler = PaymentMessageHandler(_process(store))
+    gateway = FakeGateway()
+    handler = PaymentMessageHandler(_process(store, gateway))
     await handler.handle(body, {"x-outbox-id": str(outbox_id)})
     await handler.handle(body, {"x-outbox-id": str(outbox_id)})
     stored = store.payments[payment.id.value]
     assert stored.is_terminal
     assert outbox_id in store.inbox
+    assert gateway.calls == 1
+    assert gateway.captures == 1
 
 
 @pytest.mark.asyncio
