@@ -10,7 +10,7 @@ from application.exceptions import (
     IdempotencyConflict,
 )
 from application.use_cases.create_payment import CreatePayment
-from domain.exceptions import InvalidCurrencyError
+from domain.exceptions import InvalidCurrencyError, InvalidWebhookUrlError
 from domain.ids import IdempotencyKey
 from domain.payment import Payment
 from tests.application.fakes import (
@@ -74,6 +74,14 @@ async def test_payment_and_outbox_appear_together() -> None:
 async def test_unsupported_currency_is_domain_error() -> None:
     with pytest.raises(InvalidCurrencyError):
         await _use_case(InMemoryStore()).execute(_command(currency="GBP"))
+
+
+@pytest.mark.asyncio
+async def test_private_webhook_url_is_domain_error() -> None:
+    with pytest.raises(InvalidWebhookUrlError):
+        await _use_case(InMemoryStore()).execute(
+            _command(webhook_url="http://127.0.0.1/hook"),
+        )
 
 
 def _duplicate_missing_factory(store: InMemoryStore):

@@ -13,6 +13,7 @@ from application.uow import UowFactory
 from domain.ids import IdempotencyKey, PaymentId
 from domain.money import Money
 from domain.payment import Payment
+from domain.webhook import WebhookUrl
 
 
 class CreatePayment:
@@ -23,6 +24,7 @@ class CreatePayment:
     async def execute(self, command: CreatePaymentInput) -> PaymentOutput:
         money = Money(command.amount, command.currency)
         key = IdempotencyKey(command.idempotency_key)
+        webhook_url = WebhookUrl(command.webhook_url).value
         now = self._clock.now()
         payment = Payment.create(
             id=PaymentId(uuid4()),
@@ -30,7 +32,7 @@ class CreatePayment:
             description=command.description,
             metadata=command.metadata,
             idempotency_key=key,
-            webhook_url=command.webhook_url,
+            webhook_url=webhook_url,
             created_at=now,
         )
         try:

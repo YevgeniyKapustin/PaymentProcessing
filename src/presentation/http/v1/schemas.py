@@ -2,13 +2,19 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, HttpUrl
 
 from application.payments.dto import CreatePaymentInput
 from domain.money import Currency
+from domain.webhook import WebhookUrl
+
+
+def _public_webhook_url(url: HttpUrl) -> HttpUrl:
+    WebhookUrl(str(url))
+    return url
 
 
 class CreatePaymentRequest(BaseModel):
@@ -18,7 +24,7 @@ class CreatePaymentRequest(BaseModel):
     currency: Currency
     description: str
     metadata: dict[str, Any] = Field(default_factory=dict)
-    webhook_url: HttpUrl
+    webhook_url: Annotated[HttpUrl, AfterValidator(_public_webhook_url)]
 
     def to_input(self, idempotency_key: str) -> CreatePaymentInput:
         return CreatePaymentInput(

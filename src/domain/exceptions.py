@@ -21,6 +21,10 @@ class InvalidPaymentIdError(DomainError):
     pass
 
 
+class InvalidWebhookUrlError(DomainError):
+    pass
+
+
 class IllegalStatusTransitionError(DomainError):
     def __init__(self, current: str, target: str) -> None:
         self.current = current

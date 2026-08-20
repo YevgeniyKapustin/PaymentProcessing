@@ -4,6 +4,9 @@ from typing import Any
 
 import httpx
 
+from application.exceptions import PermanentProcessingError
+from domain.exceptions import InvalidWebhookUrlError
+from domain.webhook import WebhookUrl
 from infrastructure.webhooks.errors import WebhookErrorMapper
 
 
@@ -23,6 +26,10 @@ class HttpxWebhookSender:
         *,
         idempotency_key: str,
     ) -> None:
+        try:
+            WebhookUrl(url)
+        except InvalidWebhookUrlError as exc:
+            raise PermanentProcessingError(str(exc)) from exc
         try:
             response = await self._client.post(
                 url,

@@ -47,6 +47,20 @@ async def test_webhook_timeout_is_transient() -> None:
 
 
 @pytest.mark.asyncio
+async def test_private_webhook_url_is_permanent() -> None:
+    def handler(request: Request) -> Response:
+        raise AssertionError("must not send")
+
+    async with AsyncClient(transport=MockTransport(handler)) as client:
+        with pytest.raises(PermanentProcessingError):
+            await HttpxWebhookSender(client).send(
+                "http://127.0.0.1/hook",
+                {"ok": True},
+                idempotency_key="pay-1",
+            )
+
+
+@pytest.mark.asyncio
 async def test_webhook_sends_idempotency_key() -> None:
     seen: list[Request] = []
 

@@ -151,6 +151,18 @@ async def test_create_with_invalid_webhook_url_is_422() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_with_private_webhook_url_is_422() -> None:
+    transport = ASGITransport(app=_app())
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/payments",
+            json={**BODY, "webhook_url": "http://127.0.0.1/hook"},
+            headers=HEADERS,
+        )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_create_with_empty_idempotency_key_is_422() -> None:
     transport = ASGITransport(app=_app())
     async with AsyncClient(transport=transport, base_url="http://test") as client:

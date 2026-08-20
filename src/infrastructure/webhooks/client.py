@@ -22,4 +22,5 @@ class HttpxWebhookClientFactory:
                 max_connections=self._max_connections,
                 max_keepalive_connections=self._max_keepalive,
             ),
+            follow_redirects=False,
         )
