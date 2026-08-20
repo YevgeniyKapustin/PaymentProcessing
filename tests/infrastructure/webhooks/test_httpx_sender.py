@@ -12,6 +12,7 @@ from application.exceptions import (
     PermanentProcessingError,
     TransientDependencyError,
 )
+from domain.exceptions import InvalidWebhookUrlError
 from infrastructure.webhooks.httpx_sender import HttpxWebhookSender
 
 
@@ -65,7 +66,7 @@ async def test_private_webhook_url_is_permanent() -> None:
         raise AssertionError("must not send")
 
     async with AsyncClient(transport=MockTransport(handler)) as client:
-        with pytest.raises(PermanentProcessingError):
+        with pytest.raises(InvalidWebhookUrlError):
             await HttpxWebhookSender(client).send(
                 "http://127.0.0.1/hook",
                 {"ok": True},

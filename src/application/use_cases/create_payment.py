@@ -59,7 +59,8 @@ class CreatePayment:
                 await uow.commit()
         except DuplicateIdempotencyKey:
             return await self._replay_existing(command, money, key)
-        return PaymentOutput.from_payment(payment)
+        else:
+            return PaymentOutput.from_payment(payment)
 
     async def _replay_existing(
         self,

@@ -17,9 +17,17 @@ from presentation.http.access import REQUEST_ID_HEADER
 log = logging.getLogger(__name__)
 
 CallNext = Callable[[Request], Awaitable[Response]]
+ErrorHandler = Callable[[Request, Exception], Awaitable[JSONResponse]]
 
 
-class UnhandledErrorMiddleware:
+class HttpErrorBoundary:
+    _RESPONSES: tuple[tuple[type[BaseException], int, str | None], ...] = (
+        (IdempotencyConflict, 409, "Idempotency key conflict"),
+        (DuplicateIdempotencyKey, 409, "Idempotency key conflict"),
+        (PaymentNotFound, 404, "Payment not found"),
+        (DomainError, 422, None),
+    )
+
     async def __call__(self, request: Request, call_next: CallNext) -> Response:
         try:
             return await call_next(request)
@@ -34,22 +42,16 @@ class UnhandledErrorMiddleware:
                 response.headers[REQUEST_ID_HEADER] = request_id
             return response
 
-
-class HttpExceptionHandlers:
-    async def handle_conflict(self, request: Request, exc: Exception) -> JSONResponse:
-        return JSONResponse(
-            status_code=409,
-            content={"detail": "Idempotency key conflict"},
-        )
-
-    async def handle_not_found(self, request: Request, exc: Exception) -> JSONResponse:
-        return JSONResponse(status_code=404, content={"detail": "Payment not found"})
-
-    async def handle_domain_error(self, request: Request, exc: Exception) -> JSONResponse:
-        return JSONResponse(status_code=422, content={"detail": str(exc)})
-
     def register(self, app: FastAPI) -> None:
-        app.add_exception_handler(IdempotencyConflict, self.handle_conflict)
-        app.add_exception_handler(DuplicateIdempotencyKey, self.handle_conflict)
-        app.add_exception_handler(PaymentNotFound, self.handle_not_found)
-        app.add_exception_handler(DomainError, self.handle_domain_error)
+        for exc_type, status, detail in self._RESPONSES:
+            app.add_exception_handler(exc_type, self._handler(status, detail))
+
+    @staticmethod
+    def _handler(status: int, detail: str | None) -> ErrorHandler:
+        async def handle(_request: Request, exc: Exception) -> JSONResponse:
+            return JSONResponse(
+                status_code=status,
+                content={"detail": detail if detail is not None else str(exc)},
+            )
+
+        return handle

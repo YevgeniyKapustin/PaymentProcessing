@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from application.exceptions import PermanentProcessingError
+from application.exceptions import ApplicationError, TransientDependencyError
 from application.retry.backoff import ExponentialDelay
+from domain.exceptions import DomainError
 
 MAX_ATTEMPTS = 3
 RETRY_INITIAL_SECONDS = 1.0
@@ -30,11 +31,18 @@ class RetryPolicy:
         )
 
     def decide_action(self, retry_count: int, error: BaseException) -> DispatchAction:
-        if isinstance(error, PermanentProcessingError):
+        if not self.is_retryable(error):
             return DispatchAction.DLQ
         if retry_count + 1 >= self._max_attempts:
             return DispatchAction.DLQ
         return DispatchAction.RETRY
+
+    def is_retryable(self, error: BaseException) -> bool:
+        if isinstance(error, TransientDependencyError):
+            return True
+        if isinstance(error, (ApplicationError, DomainError)):
+            return False
+        return True
 
     def compute_delay_seconds(self, retry_count: int) -> int:
         delay = self._delay.delay_for(max(retry_count, 0) + 1)

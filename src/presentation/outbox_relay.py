@@ -40,10 +40,11 @@ class OutboxRelay:
 
     async def _run(self) -> None:
         while not self._loop.is_stopped():
-            try:
-                published = await self._publish_outbox.execute()
-            except Exception:
-                log.exception("outbox relay failed")
+            published = await self._loop.isolate(
+                self._publish_outbox.execute,
+                error_event="outbox relay failed",
+            )
+            if published is None:
                 await self._loop.wait(self._backoff.next_delay())
                 continue
             self._backoff.reset()

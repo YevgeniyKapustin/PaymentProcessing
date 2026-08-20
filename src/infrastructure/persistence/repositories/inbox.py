@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from infrastructure.persistence.models.inbox import InboxModel
@@ -18,11 +18,9 @@ class SqlInboxRepository:
         return model is not None
 
     async def add(self, message_id: UUID, processed_at: datetime) -> None:
-        try:
-            async with self._session.begin_nested():
-                self._session.add(
-                    InboxModel(message_id=message_id, processed_at=processed_at),
-                )
-                await self._session.flush()
-        except IntegrityError:
-            return
+        stmt = (
+            insert(InboxModel)
+            .values(message_id=message_id, processed_at=processed_at)
+            .on_conflict_do_nothing(index_elements=["message_id"])
+        )
+        await self._session.execute(stmt)

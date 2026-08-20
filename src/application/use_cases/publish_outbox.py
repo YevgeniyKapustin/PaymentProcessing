@@ -72,18 +72,21 @@ class PublishOutbox:
         try:
             for record in records:
                 try:
-                    await self._publish_one(record)
-                    await self._mark_processed(record)
+                    await self._deliver(record)
+                except Exception:
+                    log.exception(
+                        "outbox.publish_failed",
+                        extra=self._log_fields(record),
+                    )
+                    self._metrics.record_error()
+                    if published == 0:
+                        await self._unclaim([item.id for item in records])
+                        raise
+                    await self._retry_or_fail(record)
+                else:
                     published += 1
                     lag = (self._clock.now() - record.created_at).total_seconds()
                     self._metrics.record_published(lag)
-                except Exception:
-                    log.exception("outbox.publish_failed", extra=self._log_fields(record))
-                    self._metrics.record_error()
-                    if published == 0:
-                        await self._unclaim([record.id for record in records])
-                        raise
-                    await self._retry_or_fail(record)
         finally:
             self._metrics.observe_batch(time.perf_counter() - started)
             await self._gauges.refresh()
@@ -100,6 +103,10 @@ class PublishOutbox:
             if records:
                 await uow.commit()
             return list(records)
+
+    async def _deliver(self, record: OutboxRecord) -> None:
+        await self._publish_one(record)
+        await self._mark_processed(record)
 
     async def _publish_one(self, record: OutboxRecord) -> None:
         body, headers = self._events.encode(record)

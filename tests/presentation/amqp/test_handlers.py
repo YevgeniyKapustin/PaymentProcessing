@@ -49,6 +49,20 @@ def _raw(body: dict) -> bytes:
     return json.dumps(body).encode("utf-8")
 
 
+class _FakeMessage:
+    def __init__(self, body: bytes, headers: dict | None = None) -> None:
+        self.body = body
+        self.headers = headers
+        self.acked = False
+        self.requeue: bool | None = None
+
+    async def ack(self) -> None:
+        self.acked = True
+
+    async def reject(self, requeue: bool = False) -> None:
+        self.requeue = requeue
+
+
 async def _handle(
     body: dict,
     headers: dict | None,
@@ -59,11 +73,11 @@ async def _handle(
     publisher: FakePublisher | None = None,
 ) -> FakePublisher:
     used_publisher = publisher or FakePublisher()
-    handler = PaymentMessageHandler(
+    dispatcher = PaymentMessageDispatcher(
         _process(store or InMemoryStore(), gateway),
         used_publisher,
     )
-    await handler.handle(body, headers, raw)
+    await dispatcher.dispatch(body, _FakeMessage(raw, headers))
     return used_publisher
 
 
@@ -290,6 +304,22 @@ async def test_unknown_payment_goes_to_dlq() -> None:
 
 
 @pytest.mark.asyncio
+async def test_unknown_error_schedules_retry() -> None:
+    store = InMemoryStore()
+    payment = pending_payment()
+    store.payments[payment.id.value] = payment
+    body = {"payment_id": str(payment.id.value)}
+    publisher = await _handle(
+        body,
+        {},
+        _raw(body),
+        store=store,
+        gateway=FakeGateway(error=RuntimeError("boom")),
+    )
+    assert publisher.messages[0][0] == RETRY_ROUTING_KEY
+
+
+@pytest.mark.asyncio
 async def test_envelope_message_is_deduped_on_retry() -> None:
     store = InMemoryStore()
     payment = pending_payment()
@@ -302,26 +332,12 @@ async def test_envelope_message_is_deduped_on_retry() -> None:
         "event_version": 1,
         "payload": {"payment_id": str(payment.id.value)},
     }
-    handler = PaymentMessageHandler(_process(store), FakePublisher())
-    await handler.handle(body, {"x-outbox-id": str(outbox_id)}, _raw(body))
-    await handler.handle(body, {"x-outbox-id": str(outbox_id)}, _raw(body))
+    handler = PaymentMessageHandler(_process(store))
+    await handler.handle(body, {"x-outbox-id": str(outbox_id)})
+    await handler.handle(body, {"x-outbox-id": str(outbox_id)})
     stored = store.payments[payment.id.value]
     assert stored.is_terminal
     assert outbox_id in store.inbox
-
-
-class _FakeMessage:
-    def __init__(self, body: bytes, headers: dict | None = None) -> None:
-        self.body = body
-        self.headers = headers or {}
-        self.acked = False
-        self.requeue: bool | None = None
-
-    async def ack(self) -> None:
-        self.acked = True
-
-    async def reject(self, requeue: bool = False) -> None:
-        self.requeue = requeue
 
 
 @pytest.mark.asyncio

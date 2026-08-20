@@ -1,49 +1,33 @@
-import asyncio
-
-import pytest
+from uuid import uuid4
 
 from application.exceptions import (
+    ApplicationError,
+    DuplicateIdempotencyKey,
+    IdempotencyConflict,
+    PaymentNotFound,
     PermanentProcessingError,
+    ProcessingError,
     TransientDependencyError,
-    wrap_as_transient,
 )
+from domain.exceptions import DomainError
 
 
-def test_wrap_as_transient_reraises_transient() -> None:
-    with pytest.raises(TransientDependencyError, match="busy"):
-        with wrap_as_transient("wrapped"):
-            raise TransientDependencyError("busy")
+def test_application_errors_share_a_base() -> None:
+    assert issubclass(DuplicateIdempotencyKey, ApplicationError)
+    assert issubclass(IdempotencyConflict, ApplicationError)
+    assert issubclass(PaymentNotFound, ApplicationError)
+    assert issubclass(ProcessingError, ApplicationError)
+    assert issubclass(TransientDependencyError, ProcessingError)
+    assert issubclass(PermanentProcessingError, ProcessingError)
 
 
-def test_wrap_as_transient_reraises_permanent() -> None:
-    with pytest.raises(PermanentProcessingError, match="declined"):
-        with wrap_as_transient("wrapped"):
-            raise PermanentProcessingError("declined")
+def test_domain_and_application_errors_are_separate() -> None:
+    assert not issubclass(DomainError, ApplicationError)
+    assert not issubclass(ApplicationError, DomainError)
 
 
-def test_wrap_as_transient_wraps_unknown_errors() -> None:
-    with pytest.raises(TransientDependencyError, match="wrapped") as caught:
-        with wrap_as_transient("wrapped"):
-            raise RuntimeError("boom")
-    assert isinstance(caught.value.__cause__, RuntimeError)
-
-
-@pytest.mark.asyncio
-async def test_wrap_as_transient_wraps_errors_raised_from_await() -> None:
-    async def boom() -> None:
-        raise RuntimeError("boom")
-
-    with pytest.raises(TransientDependencyError, match="wrapped") as caught:
-        with wrap_as_transient("wrapped"):
-            await boom()
-    assert isinstance(caught.value.__cause__, RuntimeError)
-
-
-@pytest.mark.asyncio
-async def test_wrap_as_transient_does_not_wrap_cancellation() -> None:
-    async def cancelled() -> None:
-        raise asyncio.CancelledError
-
-    with pytest.raises(asyncio.CancelledError):
-        with wrap_as_transient("wrapped"):
-            await cancelled()
+def test_payment_not_found_keeps_id() -> None:
+    payment_id = uuid4()
+    error = PaymentNotFound(payment_id)
+    assert error.payment_id == payment_id
+    assert str(payment_id) in str(error)

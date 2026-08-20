@@ -4,8 +4,11 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
+from typing import TypeVar
 
 log = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class WorkerLoop:
@@ -30,6 +33,20 @@ class WorkerLoop:
     async def wait(self, timeout: float) -> None:
         with suppress(TimeoutError):
             await asyncio.wait_for(self._stop.wait(), timeout=timeout)
+
+    async def isolate(
+        self,
+        action: Callable[[], Awaitable[T]],
+        *,
+        error_event: str,
+    ) -> T | None:
+        try:
+            return await action()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception(error_event)
+            return None
 
     async def _guard(self, run: Callable[[], Awaitable[None]]) -> None:
         try:

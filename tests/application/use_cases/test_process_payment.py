@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 
 from application.exceptions import (
+    PaymentNotFound,
     PermanentProcessingError,
     TransientDependencyError,
 )
@@ -132,7 +133,7 @@ async def test_missing_payment_is_permanent() -> None:
     store = InMemoryStore()
     gateway = FakeGateway()
     webhook = FakeWebhookSender()
-    with pytest.raises(PermanentProcessingError):
+    with pytest.raises(PaymentNotFound):
         await _use_case(store, gateway, webhook).execute(uuid4())
     assert gateway.calls == 0
     assert webhook.calls == []
@@ -164,13 +165,13 @@ async def test_gateway_permanent_error_is_reraised() -> None:
 
 
 @pytest.mark.asyncio
-async def test_unexpected_gateway_error_becomes_transient() -> None:
+async def test_unexpected_gateway_error_is_reraised() -> None:
     store = InMemoryStore()
     payment = pending_payment()
     _seed(store, payment)
     gateway = FakeGateway(error=RuntimeError("boom"))
     webhook = FakeWebhookSender()
-    with pytest.raises(TransientDependencyError):
+    with pytest.raises(RuntimeError, match="boom"):
         await _use_case(store, gateway, webhook).execute(payment.id.value)
     assert store.payments[payment.id.value].status is PaymentStatus.PENDING
 
@@ -188,7 +189,7 @@ async def test_retry_after_save_failure_does_not_capture_twice() -> None:
         webhook,
         CLOCK,
     )
-    with pytest.raises(TransientDependencyError, match="persist"):
+    with pytest.raises(RuntimeError, match="save failed"):
         await use_case.execute(payment.id.value)
     assert gateway.captures == 1
     assert store.payments[payment.id.value].status is PaymentStatus.PENDING
@@ -230,7 +231,7 @@ async def test_payment_missing_on_lock_is_permanent() -> None:
         webhook,
         CLOCK,
     )
-    with pytest.raises(PermanentProcessingError, match="not found"):
+    with pytest.raises(PaymentNotFound):
         await use_case.execute(payment.id.value)
     assert gateway.calls == 1
     assert webhook.calls == []

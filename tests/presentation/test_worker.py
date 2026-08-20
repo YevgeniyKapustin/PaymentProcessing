@@ -36,6 +36,20 @@ def test_jitter_uses_shared_delay_seconds(monkeypatch: MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_isolate_swallows_tick_errors_and_keeps_value() -> None:
+    loop = WorkerLoop()
+
+    async def boom() -> int:
+        raise RuntimeError("tick failed")
+
+    async def ok() -> int:
+        return 7
+
+    assert await loop.isolate(boom, error_event="tick failed") is None
+    assert await loop.isolate(ok, error_event="tick failed") == 7
+
+
+@pytest.mark.asyncio
 async def test_can_restart_after_stop() -> None:
     starts = 0
     loop = WorkerLoop()
