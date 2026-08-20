@@ -16,6 +16,19 @@ from domain.payment import Payment
 from domain.webhook import WebhookUrl
 
 
+def matches_create_input(
+    payment: Payment,
+    command: CreatePaymentInput,
+    money: Money,
+) -> bool:
+    return (
+        payment.money == money
+        and payment.description == command.description
+        and payment.metadata == command.metadata
+        and payment.webhook_url == command.webhook_url
+    )
+
+
 class CreatePayment:
     def __init__(self, uow_factory: UowFactory, clock: Clock) -> None:
         self._uow_factory = uow_factory
@@ -58,11 +71,6 @@ class CreatePayment:
             existing = await uow.payments.get_by_idempotency_key(key)
         if existing is None:
             raise IdempotencyConflict() from None
-        if not existing.matches_create_payload(
-            money=money,
-            description=command.description,
-            metadata=command.metadata,
-            webhook_url=command.webhook_url,
-        ):
+        if not matches_create_input(existing, command, money):
             raise IdempotencyConflict(existing.id.value) from None
         return PaymentOutput.from_payment(existing)

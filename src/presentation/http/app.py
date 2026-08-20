@@ -9,7 +9,7 @@ from application.ports import ReadinessCheck
 from application.use_cases.create_payment import CreatePayment
 from application.use_cases.get_payment import GetPayment
 from presentation.http.access import AccessLogMiddleware
-from presentation.http.errors import HttpExceptionHandlers
+from presentation.http.errors import HttpExceptionHandlers, UnhandledErrorMiddleware
 from presentation.http.ops import OpsRouter
 from presentation.http.v1.payments import router as payments_router
 
@@ -19,9 +19,11 @@ class HttpAppFactory:
         self,
         *,
         errors: HttpExceptionHandlers | None = None,
+        unhandled: UnhandledErrorMiddleware | None = None,
         access_log: AccessLogMiddleware | None = None,
     ) -> None:
         self._errors = errors or HttpExceptionHandlers()
+        self._unhandled = unhandled or UnhandledErrorMiddleware()
         self._access_log = access_log or AccessLogMiddleware()
 
     def create(
@@ -39,6 +41,7 @@ class HttpAppFactory:
         app.state.get_payment = get_payment
         app.state.api_key = api_key
         app.include_router(payments_router)
+        app.middleware("http")(self._unhandled)
         app.middleware("http")(self._access_log)
         self._errors.register(app)
         OpsRouter(metrics_text=metrics_text, readiness=readiness).register(app)

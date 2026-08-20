@@ -1,10 +1,10 @@
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from runtime import Runtime, UseCases
-from presentation.api import PaymentApi
+from presentation.publisher import OutboxPublisher
 from infrastructure.config import Settings
 from infrastructure.resources import Resources
 
@@ -37,14 +37,40 @@ def _runtime() -> Runtime:
     )
 
 
+class FakeRelay:
+    def __init__(self) -> None:
+        self.started = False
+        self.stopped = False
+
+    def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+
 @pytest.mark.asyncio
-async def test_lifespan_starts_and_closes_runtime() -> None:
+async def test_lifespan_starts_runtime_and_relay() -> None:
     runtime = _runtime()
     runtime.start = AsyncMock()
     runtime.close = AsyncMock()
-    api = PaymentApi(runtime)
+    relay = FakeRelay()
+    publisher = OutboxPublisher(runtime, relay=relay)
     app = SimpleNamespace(state=SimpleNamespace())
-    async with api.lifespan(app):
+    async with publisher.lifespan(app):
         runtime.start.assert_awaited_once()
-        assert app.state.runtime is runtime
+        assert relay.started
+    assert relay.stopped
+    runtime.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_close_releases_runtime_if_relay_stop_fails() -> None:
+    runtime = _runtime()
+    runtime.close = AsyncMock()
+    relay = MagicMock()
+    relay.stop = AsyncMock(side_effect=RuntimeError("busy"))
+    publisher = OutboxPublisher(runtime, relay=relay)
+    with pytest.raises(RuntimeError, match="busy"):
+        await publisher.close()
     runtime.close.assert_awaited_once()

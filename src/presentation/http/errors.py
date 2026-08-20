@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+import logging
+from collections.abc import Awaitable, Callable
+
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
 from application.exceptions import (
@@ -9,6 +12,27 @@ from application.exceptions import (
     PaymentNotFound,
 )
 from domain.exceptions import DomainError
+from presentation.http.access import REQUEST_ID_HEADER
+
+log = logging.getLogger(__name__)
+
+CallNext = Callable[[Request], Awaitable[Response]]
+
+
+class UnhandledErrorMiddleware:
+    async def __call__(self, request: Request, call_next: CallNext) -> Response:
+        try:
+            return await call_next(request)
+        except Exception:
+            log.exception("http.unhandled_error")
+            response = JSONResponse(
+                {"detail": "Internal Server Error"},
+                status_code=500,
+            )
+            request_id = getattr(request.state, "request_id", None)
+            if request_id:
+                response.headers[REQUEST_ID_HEADER] = request_id
+            return response
 
 
 class HttpExceptionHandlers:

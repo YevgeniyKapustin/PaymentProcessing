@@ -5,7 +5,6 @@ import time
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
-from fastapi.responses import JSONResponse
 
 from presentation.http.policy import AccessLogPolicy
 from presentation.log_context import RequestId, log_context
@@ -38,35 +37,17 @@ class AccessLogMiddleware:
         request_id = self._request_ids.resolve(
             request.headers.get(REQUEST_ID_HEADER),
         )
+        request.state.request_id = request_id
         timer = RequestTimer()
         with log_context(request_id=request_id):
-            try:
-                response = await call_next(request)
-            except Exception:
-                self._log_failure(request, timer.duration_ms())
-                response = JSONResponse(
-                    {"detail": "Internal Server Error"},
-                    status_code=500,
-                )
-            else:
-                self._log_access(
-                    request,
-                    status_code=response.status_code,
-                    duration_ms=timer.duration_ms(),
-                )
+            response = await call_next(request)
+            self._log_access(
+                request,
+                status_code=response.status_code,
+                duration_ms=timer.duration_ms(),
+            )
             response.headers[REQUEST_ID_HEADER] = request_id
             return response
-
-    def _log_failure(self, request: Request, duration_ms: float) -> None:
-        log.exception(
-            "http.request",
-            extra={
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": 500,
-                "duration_ms": duration_ms,
-            },
-        )
 
     def _log_access(
         self,

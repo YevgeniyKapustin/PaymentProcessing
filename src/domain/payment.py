@@ -151,21 +151,6 @@ class Payment:
     def fail(self, processed_at: datetime) -> None:
         self._complete(PaymentStatus.FAILED, processed_at)
 
-    def matches_create_payload(
-        self,
-        *,
-        money: Money,
-        description: str,
-        metadata: Mapping[str, Any],
-        webhook_url: str,
-    ) -> bool:
-        return (
-            self._money == money
-            and self._description == description
-            and self._metadata == dict(metadata)
-            and self._webhook_url == webhook_url
-        )
-
     def _complete(self, status: PaymentStatus, processed_at: datetime) -> None:
         if self._status in _TERMINAL:
             return

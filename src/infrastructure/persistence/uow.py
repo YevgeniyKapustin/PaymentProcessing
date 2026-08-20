@@ -9,7 +9,8 @@ from application.ports import (
     PaymentRepository,
 )
 from infrastructure.persistence.repositories.inbox import SqlInboxRepository
-from infrastructure.persistence.repositories.outbox import SqlOutboxRepository
+from infrastructure.persistence.repositories.outbox_queue import SqlOutboxQueue
+from infrastructure.persistence.repositories.outbox_writer import SqlOutboxWriter
 from infrastructure.persistence.repositories.payment import SqlPaymentRepository
 
 
@@ -30,10 +31,9 @@ class SqlAlchemyUnitOfWork:
 
     async def __aenter__(self) -> SqlAlchemyUnitOfWork:
         self._session = self._session_factory()
-        outbox = SqlOutboxRepository(self._session)
         self.payments = SqlPaymentRepository(self._session)
-        self.outbox = outbox
-        self.outbox_queue = outbox
+        self.outbox = SqlOutboxWriter(self._session)
+        self.outbox_queue = SqlOutboxQueue(self._session)
         self.inbox = SqlInboxRepository(self._session)
         return self
 

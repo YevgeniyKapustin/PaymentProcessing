@@ -7,7 +7,9 @@ from typing import Any
 from uuid import UUID
 
 from application.outbox.codec import OutboxEventCodec
+from application.outbox.gauges import OutboxQueueGauges
 from application.outbox.metrics import NullOutboxMetrics
+from application.outbox.purge import PurgeProcessedOutbox
 from application.outbox.routing import NEW_ROUTING_KEY
 from application.ports import Clock, OutboxMetrics, Publisher
 from application.records import OutboxRecord, OutboxStatus
@@ -34,6 +36,8 @@ class PublishOutbox:
         metrics: OutboxMetrics | None = None,
         events: OutboxEventCodec | None = None,
         backoff: ExponentialDelay | None = None,
+        purge: PurgeProcessedOutbox | None = None,
+        gauges: OutboxQueueGauges | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._publisher = publisher
@@ -41,7 +45,6 @@ class PublishOutbox:
         self._batch_size = batch_size
         self._max_attempts = max_attempts
         self._claim_timeout = timedelta(seconds=claim_timeout_seconds)
-        self._retention_days = retention_days
         self._events = events or OutboxEventCodec()
         self._backoff = backoff or ExponentialDelay(
             initial=retry_initial_seconds,
@@ -49,13 +52,20 @@ class PublishOutbox:
             jitter=jitter,
         )
         self._metrics = metrics or NullOutboxMetrics()
+        self._purge = purge or PurgeProcessedOutbox(
+            uow_factory,
+            clock,
+            retention_days=retention_days,
+            batch_size=batch_size,
+        )
+        self._gauges = gauges or OutboxQueueGauges(uow_factory, self._metrics)
 
     async def execute(self) -> int:
         started = time.perf_counter()
         records = await self._claim()
-        await self._refresh_gauges()
+        await self._gauges.refresh()
         if not records:
-            await self._purge()
+            await self._purge.execute()
             self._metrics.observe_batch(time.perf_counter() - started)
             return 0
         published = 0
@@ -76,7 +86,7 @@ class PublishOutbox:
                     await self._retry_or_fail(record)
         finally:
             self._metrics.observe_batch(time.perf_counter() - started)
-            await self._refresh_gauges()
+            await self._gauges.refresh()
         return published
 
     async def _claim(self) -> list[OutboxRecord]:
@@ -128,19 +138,6 @@ class PublishOutbox:
             return
         async with self._uow_factory() as uow:
             await uow.outbox_queue.unclaim(ids)
-            await uow.commit()
-
-    async def _refresh_gauges(self) -> None:
-        async with self._uow_factory() as uow:
-            pending = await uow.outbox_queue.count_pending()
-            failed = await uow.outbox_queue.count_failed()
-        self._metrics.set_queue_size(pending)
-        self._metrics.set_failed_count(failed)
-
-    async def _purge(self) -> None:
-        cutoff = self._clock.now() - timedelta(days=self._retention_days)
-        async with self._uow_factory() as uow:
-            await uow.outbox_queue.delete_processed_before(cutoff, self._batch_size)
             await uow.commit()
 
     def _log_fields(

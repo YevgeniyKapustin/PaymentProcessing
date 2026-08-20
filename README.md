@@ -5,9 +5,9 @@ Use cases mutate the `Payment` aggregate and write the outbox in one UoW.
 Postgres, RabbitMQ, httpx, and the gateway emulator sit behind outbound ports.
 `src/factory.py` is the only module that wires concrete classes.
 
-POST never publishes to RabbitMQ. The API process relays unpublished outbox rows
-with confirms, then sets `published_at`. One API worker keeps `/metrics` honest
-for that in-process relay — a demo shortcut, not a dedicated publisher.
+POST never publishes to RabbitMQ. A dedicated publisher process relays
+unpublished outbox rows with confirms, then sets `published_at`. Scrape
+`/metrics` on that process (`:8001`), not on the API.
 The consumer is idempotent because `succeed()` / `fail()` are no-ops on a
 terminal payment. Webhooks are at-least-once: the inbox row is written after
 a successful POST, so a crash in between redelivers. Receivers should key on
@@ -35,6 +35,7 @@ RabbitMQ). Then open:
 - API docs: http://localhost:8000/docs
 - Liveness: http://localhost:8000/health
 - Readiness: http://localhost:8000/ready
+- Outbox metrics: http://localhost:8001/metrics
 - RabbitMQ UI: http://127.0.0.1:15672 (`guest` / `guest`)
 
 Stop with `Ctrl+C`, or `docker compose down`.

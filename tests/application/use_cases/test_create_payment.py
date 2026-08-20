@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -9,9 +10,10 @@ from application.exceptions import (
     DuplicateIdempotencyKey,
     IdempotencyConflict,
 )
-from application.use_cases.create_payment import CreatePayment
+from application.use_cases.create_payment import CreatePayment, matches_create_input
 from domain.exceptions import InvalidCurrencyError, InvalidWebhookUrlError
-from domain.ids import IdempotencyKey
+from domain.ids import IdempotencyKey, PaymentId
+from domain.money import Currency, Money
 from domain.payment import Payment
 from tests.application.fakes import (
     FrozenClock,
@@ -110,3 +112,21 @@ async def test_duplicate_key_without_existing_is_conflict() -> None:
         await use_case.execute(_command())
     assert exc_info.value.payment_id is None
     assert not isinstance(exc_info.value, DuplicateIdempotencyKey)
+
+
+def test_matches_create_input() -> None:
+    payment = Payment.create(
+        id=PaymentId(uuid4()),
+        money=Money(Decimal("10.00"), Currency.USD),
+        description="coffee",
+        metadata={"order": "1"},
+        idempotency_key=IdempotencyKey("same-key"),
+        webhook_url="https://example.com/hook",
+        created_at=datetime(2026, 8, 18, tzinfo=UTC),
+    )
+    assert matches_create_input(payment, _command(), payment.money)
+    assert not matches_create_input(
+        payment,
+        _command(description="other"),
+        payment.money,
+    )

@@ -112,6 +112,7 @@ def test_amqp_adapters_do_not_import_infrastructure() -> None:
         "dispatcher.py",
         "failures.py",
         "handlers.py",
+        "identity.py",
         "subscriber.py",
     ):
         tree = ast.parse(_amqp_source(name).read_text(encoding="utf-8"))

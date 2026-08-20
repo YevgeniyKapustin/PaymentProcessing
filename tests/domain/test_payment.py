@@ -108,23 +108,3 @@ def test_idempotency_key_rejects_empty_and_long() -> None:
     with pytest.raises(InvalidIdempotencyKeyError):
         IdempotencyKey("x" * 256)
     assert IdempotencyKey("x" * 255).value == "x" * 255
-
-
-def test_matches_create_payload() -> None:
-    payment = Payment.create(
-        id=PaymentId(uuid4()),
-        money=Money(Decimal("10.00"), Currency.USD),
-        description="x",
-        metadata={"k": "v"},
-        idempotency_key=IdempotencyKey("k"),
-        webhook_url="https://example.com/h",
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-    )
-    same = dict(
-        money=Money(Decimal("10.00"), Currency.USD),
-        description="x",
-        metadata={"k": "v"},
-        webhook_url="https://example.com/h",
-    )
-    assert payment.matches_create_payload(**same)
-    assert not payment.matches_create_payload(**{**same, "description": "other"})
