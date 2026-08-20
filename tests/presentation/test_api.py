@@ -27,8 +27,6 @@ def _runtime() -> Runtime:
             publish_outbox=AsyncMock(),
         ),
         publisher=AsyncMock(),
-        gateway=AsyncMock(),
-        clock=AsyncMock(),
         resources=Resources(
             engine=AsyncMock(),
             http_client=AsyncMock(),

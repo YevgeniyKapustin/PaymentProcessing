@@ -61,8 +61,6 @@ class RuntimeFactory:
                 gateway,
             ),
             publisher=publisher,
-            gateway=gateway,
-            clock=self._clock,
             resources=resources,
             metrics=metrics,
             render_metrics=metrics.render,

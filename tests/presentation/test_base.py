@@ -29,8 +29,6 @@ def _runtime() -> Runtime:
             publish_outbox=MagicMock(),
         ),
         publisher=MagicMock(),
-        gateway=MagicMock(),
-        clock=MagicMock(),
         resources=Resources(
             engine=MagicMock(),
             http_client=MagicMock(),

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from types import TracebackType
 
 from application.outbox.metrics import NullOutboxMetrics
-from application.ports import Clock, OutboxMetrics, PaymentGateway, Publisher
+from application.ports import OutboxMetrics, Publisher
 from application.use_cases.create_payment import CreatePayment
 from application.use_cases.get_payment import GetPayment
 from application.use_cases.process_payment import ProcessPayment
@@ -31,8 +31,6 @@ class Runtime:
     settings: Settings
     use_cases: UseCases
     publisher: Publisher
-    gateway: PaymentGateway
-    clock: Clock
     resources: Resources
     metrics: OutboxMetrics = field(default_factory=NullOutboxMetrics)
     render_metrics: Callable[[], str] = field(default=_empty_metrics_text)

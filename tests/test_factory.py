@@ -48,8 +48,6 @@ def _runtime(**overrides: object) -> Runtime:
         "settings": _settings(),
         "use_cases": _use_cases(),
         "publisher": AsyncMock(),
-        "gateway": AsyncMock(),
-        "clock": SystemClock(),
         "resources": _resources(),
     }
     values.update(overrides)
@@ -66,8 +64,8 @@ async def test_factory_uses_injected_clock_and_gateway() -> None:
         gateway=gateway,
     ).build()
     try:
-        assert runtime.clock is clock
-        assert runtime.gateway is gateway
+        assert runtime.use_cases.create_payment._clock is clock
+        assert runtime.use_cases.process_payment._charge._gateway is gateway
     finally:
         await runtime.close()
 
@@ -76,8 +74,11 @@ async def test_factory_uses_injected_clock_and_gateway() -> None:
 async def test_factory_defaults_clock_and_gateway() -> None:
     runtime = RuntimeFactory(settings=_settings()).build()
     try:
-        assert isinstance(runtime.clock, SystemClock)
-        assert isinstance(runtime.gateway, RandomPaymentGateway)
+        assert isinstance(runtime.use_cases.create_payment._clock, SystemClock)
+        assert isinstance(
+            runtime.use_cases.process_payment._charge._gateway,
+            RandomPaymentGateway,
+        )
         assert runtime.resources.owns_broker is True
         assert runtime.render_metrics() == runtime.metrics.render()
     finally:
