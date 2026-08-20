@@ -225,3 +225,24 @@ async def test_ready_is_503_when_probe_fails() -> None:
         response = await client.get("/ready")
     assert response.status_code == 503
     assert response.json() == {"status": "not_ready"}
+
+
+@pytest.mark.asyncio
+async def test_ready_is_ok_when_probe_passes() -> None:
+    class Up:
+        async def ready(self) -> bool:
+            return True
+
+    clock = FrozenClock(datetime(2026, 8, 18, tzinfo=UTC))
+    factory = make_uow_factory(InMemoryStore())
+    app = HttpAppFactory().create(
+        create_payment=CreatePayment(factory, clock),
+        get_payment=GetPayment(factory),
+        api_key=API_KEY,
+        readiness=Up(),
+    )
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/ready")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}

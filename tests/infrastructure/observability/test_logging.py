@@ -53,3 +53,17 @@ def test_invalid_level_falls_back_to_info() -> None:
     logging.getLogger("sample").info("visible")
     payload = json.loads(stream.getvalue())
     assert payload["event"] == "visible"
+
+
+def test_console_renderer_is_used_when_json_disabled() -> None:
+    stream = StringIO()
+    LoggingConfigurator().configure(
+        level="INFO",
+        json_logs=False,
+        service="test",
+        stream=stream,
+    )
+    logging.getLogger("sample").info("hello")
+    output = stream.getvalue()
+    assert "hello" in output
+    assert not output.lstrip().startswith("{")

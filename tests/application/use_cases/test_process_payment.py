@@ -56,6 +56,32 @@ def make_save_failing_factory(store: InMemoryStore, fail_times: int = 1):
     return factory
 
 
+def make_missing_on_lock_factory(store: InMemoryStore):
+    def factory() -> InMemoryUnitOfWork:
+        uow = InMemoryUnitOfWork(store)
+
+        async def missing(_payment_id: object) -> None:
+            return None
+
+        uow.payments.get_for_update = missing  # type: ignore[method-assign]
+        return uow
+
+    return factory
+
+
+def make_transient_save_factory(store: InMemoryStore):
+    def factory() -> InMemoryUnitOfWork:
+        uow = InMemoryUnitOfWork(store)
+
+        async def save(_payment: Payment) -> None:
+            raise TransientDependencyError("db busy")
+
+        uow.payments.save = save  # type: ignore[method-assign]
+        return uow
+
+    return factory
+
+
 @pytest.mark.asyncio
 async def test_already_final_payment_does_not_call_gateway() -> None:
     store = InMemoryStore()
@@ -189,6 +215,45 @@ async def test_webhook_failure_after_persist_does_not_charge_again() -> None:
     assert gateway.calls == 1
     assert len(webhook.calls) == 2
     assert webhook.calls[1][1]["status"] == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_payment_missing_on_lock_is_permanent() -> None:
+    store = InMemoryStore()
+    payment = pending_payment()
+    _seed(store, payment)
+    gateway = FakeGateway(succeeded=True)
+    webhook = FakeWebhookSender()
+    use_case = ProcessPayment(
+        make_missing_on_lock_factory(store),
+        gateway,
+        webhook,
+        CLOCK,
+    )
+    with pytest.raises(PermanentProcessingError, match="not found"):
+        await use_case.execute(payment.id.value)
+    assert gateway.calls == 1
+    assert webhook.calls == []
+    assert store.payments[payment.id.value].status is PaymentStatus.PENDING
+
+
+@pytest.mark.asyncio
+async def test_transient_error_during_complete_is_reraised() -> None:
+    store = InMemoryStore()
+    payment = pending_payment()
+    _seed(store, payment)
+    gateway = FakeGateway(succeeded=True)
+    webhook = FakeWebhookSender()
+    use_case = ProcessPayment(
+        make_transient_save_factory(store),
+        gateway,
+        webhook,
+        CLOCK,
+    )
+    with pytest.raises(TransientDependencyError, match="db busy"):
+        await use_case.execute(payment.id.value)
+    assert webhook.calls == []
+    assert store.payments[payment.id.value].status is PaymentStatus.PENDING
 
 
 @pytest.mark.asyncio

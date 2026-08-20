@@ -1,5 +1,12 @@
 import pytest
-from httpx import AsyncClient, MockTransport, Request, Response, TimeoutException
+from httpx import (
+    AsyncClient,
+    ConnectError,
+    MockTransport,
+    Request,
+    Response,
+    TimeoutException,
+)
 
 from application.exceptions import (
     PermanentProcessingError,
@@ -42,8 +49,14 @@ async def test_webhook_5xx_is_transient() -> None:
 
 @pytest.mark.asyncio
 async def test_webhook_timeout_is_transient() -> None:
-    with pytest.raises(TransientDependencyError):
+    with pytest.raises(TransientDependencyError, match="timeout"):
         await _send(error=TimeoutException("timeout"))
+
+
+@pytest.mark.asyncio
+async def test_webhook_transport_error_is_transient() -> None:
+    with pytest.raises(TransientDependencyError, match="transport"):
+        await _send(error=ConnectError("down"))
 
 
 @pytest.mark.asyncio

@@ -249,6 +249,14 @@ async def test_purges_old_processed_rows_when_idle() -> None:
     assert store.outbox == []
 
 
+@pytest.mark.asyncio
+async def test_unclaim_with_no_ids_is_noop() -> None:
+    store = InMemoryStore()
+    use_case = PublishOutbox(make_uow_factory(store), FakePublisher(), CLOCK)
+    await use_case._unclaim([])
+    assert store.outbox == []
+
+
 def test_encode_outbox_event_wraps_payload() -> None:
     record = _record({"payment_id": "x"})
     body, headers = OutboxEventCodec().encode(record)

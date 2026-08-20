@@ -6,6 +6,7 @@ import logging
 from datetime import UTC, datetime
 from inspect import signature
 from pathlib import Path
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -13,6 +14,7 @@ import pytest
 from application.exceptions import TransientDependencyError
 from application.outbox.routing import DLQ_ROUTING_KEY, RETRY_ROUTING_KEY
 from application.use_cases.process_payment import ProcessPayment
+from infrastructure.messaging.topology import NEW_QUEUE, PAYMENTS_EXCHANGE
 from presentation.amqp.body import encode_message_body
 from presentation.amqp.dispatcher import PaymentMessageDispatcher
 from presentation.amqp.failures import RETRY_COUNT_HEADER
@@ -95,6 +97,9 @@ def test_raw_body_encodes_dict_and_bytes() -> None:
     assert encode_message_body(b"abc") == b"abc"
     assert json.loads(encode_message_body({"a": 1})) == {"a": 1}
     assert encode_message_body(bytearray(b"xy")) == b"xy"
+    assert encode_message_body(memoryview(b"ab")) == b"ab"
+    with pytest.raises(TypeError, match="unsupported message body"):
+        encode_message_body("raw")
 
 
 def _amqp_source(name: str) -> Path:
@@ -136,6 +141,49 @@ async def test_success_does_not_republish() -> None:
         store=store,
     )
     assert publisher.messages == []
+
+
+@pytest.mark.asyncio
+async def test_bytes_request_id_header_is_decoded() -> None:
+    store = InMemoryStore()
+    payment = pending_payment()
+    store.payments[payment.id.value] = payment
+    body = {"payment_id": str(payment.id.value)}
+    publisher = await _handle(
+        body,
+        {"x-request-id": b"amqp-bytes"},
+        _raw(body),
+        store=store,
+    )
+    assert publisher.messages == []
+    assert store.payments[payment.id.value].is_terminal
+
+
+@pytest.mark.asyncio
+async def test_subscriber_dispatches_to_handler() -> None:
+    captured: dict[str, object] = {}
+
+    def fake_subscriber(*args: object, **kwargs: object):
+        def decorator(fn):
+            captured["handler"] = fn
+            return fn
+
+        return decorator
+
+    class FakeBroker:
+        subscriber = staticmethod(fake_subscriber)
+
+    dispatcher = AsyncMock()
+    PaymentQueueSubscriber(dispatcher).register(
+        FakeBroker(),
+        queue=NEW_QUEUE,
+        exchange=PAYMENTS_EXCHANGE,
+    )
+    msg = object()
+    handler = captured["handler"]
+    assert callable(handler)
+    await handler({"payment_id": "x"}, msg)
+    dispatcher.dispatch.assert_awaited_once_with({"payment_id": "x"}, msg)
 
 
 @pytest.mark.asyncio

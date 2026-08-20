@@ -261,3 +261,7 @@ async def test_runtime_context_manager_starts_and_closes() -> None:
         runtime.close.assert_awaited_once()
     finally:
         await close()
+
+
+def test_runtime_default_metrics_text_is_empty() -> None:
+    assert _runtime().render_metrics() == ""

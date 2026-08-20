@@ -105,3 +105,10 @@ async def test_stop_propagates_caller_cancellation() -> None:
     with pytest.raises(asyncio.CancelledError):
         await stop_task
     assert loop._task is None
+
+
+@pytest.mark.asyncio
+async def test_stop_without_start_is_noop() -> None:
+    loop = WorkerLoop()
+    await asyncio.wait_for(loop.stop(), timeout=1)
+    assert loop._task is None

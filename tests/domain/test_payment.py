@@ -46,6 +46,35 @@ def test_money_rejects_zero_and_negative() -> None:
         Money(Decimal("-1.00"), Currency.USD)
 
 
+def test_money_accepts_int_amount() -> None:
+    money = Money(10, Currency.USD)
+    assert money.amount == Decimal("10.00")
+    assert money.currency is Currency.USD
+
+
+def test_money_rejects_non_decimal_text() -> None:
+    with pytest.raises(InvalidMoneyError):
+        Money("10.00", Currency.USD)  # type: ignore[arg-type]
+
+
+def test_money_rejects_non_finite() -> None:
+    with pytest.raises(InvalidMoneyError):
+        Money(Decimal("NaN"), Currency.USD)
+    with pytest.raises(InvalidMoneyError):
+        Money(Decimal("Infinity"), Currency.USD)
+
+
+def test_money_equality_and_hash() -> None:
+    left = Money(Decimal("10.00"), Currency.USD)
+    right = Money(Decimal("10.00"), Currency.USD)
+    other = Money(Decimal("11.00"), Currency.USD)
+    assert left == right
+    assert left != other
+    assert left != Decimal("10.00")
+    assert hash(left) == hash(right)
+    assert len({left, right, other}) == 2
+
+
 def test_pending_to_succeeded_sets_processed_at() -> None:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     later = datetime(2026, 1, 2, tzinfo=UTC)
